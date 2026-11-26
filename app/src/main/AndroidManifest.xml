@@ -4,7 +4,8 @@
     <application
         android:label="Mahjuris"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:hardwareAccelerated="true"
         android:theme="@style/AppTheme">
         <activity

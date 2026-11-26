@@ -47,6 +47,9 @@ public class MainActivity extends Activity {
     WebView printView;
     PlayBilling billing;
     ValueCallback<Uri[]> pending;
+    /** Só a página do próprio app (servida dos assets) pode usar a ponte MJAndroid. */
+    volatile boolean trusted;
+    String csp;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -62,20 +65,34 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "MJAndroid");
         billing = new PlayBilling(this, web);
 
+        csp = buildCsp();
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
         s.setAllowFileAccess(false);
-        s.setAllowContentAccess(true);
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowUniversalAccessFromFileURLs(false);
+        s.setGeolocationEnabled(false);
+        s.setJavaScriptCanOpenWindowsAutomatically(false);
+        s.setSupportMultipleWindows(false);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        s.setSaveFormData(false);
+        WebView.setWebContentsDebuggingEnabled(false);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setTextZoom(100);
 
         web.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
+                trusted = isOwn(url);
+            }
+
+            @Override
             public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest req) {
                 Uri u = req.getUrl();
-                if (!HOST.equals(u.getHost())) return null;
+                if (!HOST.equals(u.getHost()) || !"https".equals(u.getScheme())) return null;
                 String path = u.getPath();
                 if (path == null || path.equals("/") || path.isEmpty()) path = "/index.html";
                 try {
@@ -83,7 +100,11 @@ public class MainActivity extends Activity {
                     WebResourceResponse r = new WebResourceResponse(mime(path), mime(path).startsWith("text/") || path.endsWith(".js") ? "utf-8" : null, in);
                     Map<String, String> h = new HashMap<String, String>();
                     h.put("Cache-Control", "no-cache");
-                    h.put("Access-Control-Allow-Origin", "*");
+                    h.put("X-Content-Type-Options", "nosniff");
+                    if (path.endsWith(".html")) {
+                        h.put("Content-Security-Policy", csp);
+                        h.put("Referrer-Policy", "no-referrer");
+                    }
                     r.setResponseHeaders(h);
                     return r;
                 } catch (IOException e) {
@@ -96,8 +117,18 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, String url) {
                 Uri u = Uri.parse(url);
-                if (HOST.equals(u.getHost())) return false;
-                try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (ActivityNotFoundException e) { }
+                if (isOwn(url)) return false;
+                // Links de fora abrem no navegador, e só os seguros: nada de intent:, file:, content: ou javascript:.
+                String sc = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
+                if (sc.equals("https") || sc.equals("http") || sc.equals("mailto")) {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW, u);
+                        i.addCategory(Intent.CATEGORY_BROWSABLE);
+                        i.setComponent(null);
+                        i.setSelector(null);
+                        startActivity(i);
+                    } catch (ActivityNotFoundException e) { }
+                }
                 return true;
             }
         });
@@ -132,6 +163,29 @@ public class MainActivity extends Activity {
 
         if (state != null) web.restoreState(state);
         if (web.getUrl() == null) web.loadUrl(START);
+    }
+
+    static boolean isOwn(String url) {
+        if (url == null) return false;
+        Uri u = Uri.parse(url);
+        return "https".equals(u.getScheme()) && HOST.equals(u.getHost());
+    }
+
+    /** Regras de conteúdo da página: scripts só do próprio app e conexões só com o servidor de login. */
+    String buildCsp() {
+        String api = "";
+        try {
+            InputStream in = getAssets().open("config.js");
+            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096]; int n;
+            while ((n = in.read(buf)) > 0) b.write(buf, 0, n);
+            in.close();
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("https://([a-z0-9]+\\.supabase\\.co)").matcher(b.toString("UTF-8"));
+            if (m.find()) api = " https://" + m.group(1) + " wss://" + m.group(1);
+        } catch (IOException e) { }
+        return "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; worker-src 'self' blob:; "
+            + "connect-src 'self'" + api + "; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'";
     }
 
     static String mime(String p) {
@@ -206,10 +260,12 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public void setFullscreen(final boolean on) {
+            if (!trusted) return;
             runOnUiThread(new Runnable() { public void run() { fullscreen = on; applyFullscreen(); } });
         }
         @JavascriptInterface
         public void shareFile(final String name, final String mime, final String b64) {
+            if (!trusted) return;
             runOnUiThread(new Runnable() { public void run() {
                 try {
                     String safe = name.replaceAll("[^A-Za-z0-9._-]", "_");
@@ -235,6 +291,7 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface
         public void printHtml(final String html, final String job) {
+            if (!trusted) return;
             runOnUiThread(new Runnable() { public void run() {
                 try {
                     final WebView pw = new WebView(MainActivity.this);
@@ -256,23 +313,26 @@ public class MainActivity extends Activity {
         /** Abre a compra da assinatura Premium na Google Play. accountId: id da conta Mahjuris (opcional). */
         @JavascriptInterface
         public void buyPremium(final String accountId) {
+            if (!trusted) return;
             runOnUiThread(new Runnable() { public void run() { if (billing != null) billing.buy(accountId); } });
         }
         @JavascriptInterface
         public void buyPremium() { buyPremium(""); }
         /** Dados da assinatura ativa na Play (JSON com purchaseToken), ou "" se não houver. */
         @JavascriptInterface
-        public String playPremium() { return billing == null ? "" : billing.activeJson; }
+        public String playPremium() { return !trusted || billing == null ? "" : billing.activeJson; }
         /** Token da assinatura ativa na Play, ou "". */
         @JavascriptInterface
-        public String playPremiumToken() { return billing == null ? "" : billing.activeToken; }
+        public String playPremiumToken() { return !trusted || billing == null ? "" : billing.activeToken; }
         /** Preço do plano como a Play mostra (ex.: "R$ 19,90"), ou "". */
         @JavascriptInterface
-        public String premiumPrice() { return billing == null ? "" : billing.price(); }
+        public String premiumPrice() { return !trusted || billing == null ? "" : billing.price(); }
         @JavascriptInterface
-        public void refreshPremium() { if (billing != null) billing.refresh(); }
+        public void refreshPremium() {
+            if (!trusted) return; if (billing != null) billing.refresh(); }
         @JavascriptInterface
         public void copyText(final String text) {
+            if (!trusted) return;
             runOnUiThread(new Runnable() { public void run() {
                 try {
                     ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);

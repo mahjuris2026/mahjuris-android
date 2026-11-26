@@ -157,13 +157,14 @@ class PlayBilling implements PurchasesUpdatedListener {
         else {
             final String j = activeJson;
             // A conexão com a Play termina depois que a página abre: avisa sem recarregar.
-            act.runOnUiThread(() -> web.evaluateJavascript("window.mjPlayTokenReady&&window.mjPlayTokenReady(" + (j.isEmpty() ? "null" : j) + ")", null));
+            act.runOnUiThread(() -> { if (MainActivity.isOwn(web.getUrl())) web.evaluateJavascript("window.mjPlayTokenReady&&window.mjPlayTokenReady(" + (j.isEmpty() ? "null" : j) + ")", null); });
         }
     }
 
     void notifyPage(final String json) {
-        act.runOnUiThread(() -> web.evaluateJavascript(
-            "window.mjPremiumChanged&&window.mjPremiumChanged(" + (json == null || json.isEmpty() ? "null" : json) + ")", null));
+        // O token da compra só vai para a página do próprio app.
+        act.runOnUiThread(() -> { if (MainActivity.isOwn(web.getUrl())) web.evaluateJavascript(
+            "window.mjPremiumChanged&&window.mjPremiumChanged(" + (json == null || json.isEmpty() ? "null" : json) + ")", null); });
     }
 
     void toast(final String msg) {
