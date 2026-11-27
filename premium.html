@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahjuris Premium</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d4f7a">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="fonts.css">
+<script src="config.js"></script>
+<script src="lib/supabase.js"></script>
+<script src="sync.js"></script>
+<script src="plan.js"></script>
+<style>
+:root{--bg:#e4ebea;--panel:#f6f9f8;--fg:#15242a;--muted:#56696e;--line:#c3cfcf;--ink:#1d4f7a;--ox:#8c2d2a;--ok:#2c7a4d;--err:#b3261e;--hint:#c98a12;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif;--f-body:"IBM Plex Sans",system-ui,sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0e191d;--panel:#15242a;--fg:#e2ebec;--muted:#93a7ac;--line:#2a3d43;--ink:#86b6e4;--ox:#e7948a;--ok:#6fcf97;--err:#ff8a80;--hint:#f2c14e;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e191d;--panel:#15242a;--fg:#e2ebec;--muted:#93a7ac;--line:#2a3d43;--ink:#86b6e4;--ox:#e7948a;--ok:#6fcf97;--err:#ff8a80;--hint:#f2c14e;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--f-body);padding:24px 16px 48px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font:800 2rem/1.05 var(--f-display);letter-spacing:-.02em;margin:0} h1 span{color:var(--ox)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.price{font:800 2.2rem/1 var(--f-display)} .price small{font:500 1rem var(--f-body);color:var(--muted)}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+table{border-collapse:collapse;width:100%;font-size:.92rem} th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)} th{color:var(--muted);font-weight:600}
+.btn{font:600 1rem var(--f-body);border-radius:10px;padding:12px 16px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--panel);text-align:center;text-decoration:none}
+.btn.sec{background:var(--panel);color:var(--fg);border-color:var(--line)}
+.btn:disabled{opacity:.55;cursor:default}
+.note{color:var(--muted);font-size:.88rem;margin:0}
+.msg{margin:0;min-height:1.2em} .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mah<span>juris</span> Premium</h1>
+  <div class="panel">
+    <p style="margin:0">Uma parceria simples: você libera o Mahjuris completo por um valor simbólico e ajuda a manter o projeto, com novos baralhos e melhorias.</p>
+    <p class="note" id="valid">Vale por 1 ano a partir do pagamento. Não há cobrança automática: para continuar, é só renovar quando quiser, e o novo ano é somado ao que faltar.</p>
+    <div class="price" id="price"></div>
+    <table>
+      <tr><th></th><th>Free</th><th>Premium</th></tr>
+      <tr><td>Jogadas</td><td id="l-plays"></td><td>Ilimitadas</td></tr>
+      <tr><td>Baralhos de fábrica</td><td>1º assunto de cada matéria</td><td>Todos (cerca de 2.700 pares)</td></tr>
+      <tr><td>Baralhos seus</td><td id="l-own"></td><td>Sem limite</td></tr>
+      <tr><td>Site e app na mesma conta</td><td>Sim</td><td>Sim</td></tr>
+    </table>
+    <button class="btn" id="buy" type="button">Liberar o Premium (Pix ou cartão)</button>
+    <p class="msg" id="msg" aria-live="polite"></p>
+    <p class="note">O pagamento é feito pelo Mercado Pago. O Premium fica ligado à sua conta e vale no site e no app Android, entrando com o mesmo e-mail.</p>
+    <a class="btn sec" href="index.html">Voltar ao jogo</a>
+  </div>
+</div>
+<script>
+window.MJ_START=function(){
+  const C=window.MJ_CONFIG||{}, L=(window.MJPlan&&MJPlan.limits)||{}, $=id=>document.getElementById(id);
+  $("price").innerHTML=""; $("price").textContent=C.premiumPreco||"Preço a definir";
+  $("l-plays").textContent=(L.jogadasPorDia||5)+" por dia"; $("l-own").textContent="Até "+(L.baralhosProprios||2)+" (até "+(L.cartasPorBaralho||100)+" cartas cada)";
+  const msg=(t,c)=>{$("msg").textContent=t; $("msg").className="msg"+(c?" "+c:"")};
+  const done=()=>{ let pl={}; try{pl=JSON.parse(localStorage.getItem("mjsync.plan")||"{}")}catch(e){} const ate=pl.until?new Date(pl.until).toLocaleDateString("pt-BR"):null; $("buy").textContent="Renovar por mais 1 ano"; msg("Você é Premium"+(ate?" até "+ate:"")+". Bom estudo!","ok"); };
+  if(window.MJPlan&&MJPlan.premium()) done();
+  const q=new URLSearchParams(location.search);
+  if(q.has("ok")||q.has("pendente")){
+    msg(q.has("ok")?"Pagamento recebido. Liberando o Premium…":"Pagamento em processamento (o Pix confirma em instantes). Pode deixar esta página aberta.");
+    let n=0; const iv=setInterval(async()=>{ n++; if(window.MJSync) await MJSync.loadProfile(); if(MJPlan.premium()){ clearInterval(iv); done(); } else if(n>40){ clearInterval(iv); msg("Ainda não recebemos a confirmação. Se o valor saiu da sua conta, escreva para o contato da Política de Privacidade com o número do pagamento.","err"); } },5000);
+  }
+  if(q.has("erro")) msg("O pagamento não foi concluído. Você pode tentar de novo.","err");
+  $("buy").addEventListener("click",async()=>{
+    const cl=window.MJSync&&MJSync.client; if(!cl||!MJSync.user||!MJSync.user.email){ msg("Entre na sua conta para continuar.","err"); return; }
+    $("buy").disabled=true; msg("Abrindo o Mercado Pago…");
+    try{ const {data,error}=await cl.functions.invoke("mp-checkout",{body:{}}); if(error||!data||!data.url) throw error||new Error("sem link"); location.href=data.url; }
+    catch(e){ $("buy").disabled=false; msg("A venda pelo site ainda não está ativa ou houve um erro. Tente de novo mais tarde.","err"); }
+  });
+};
+if(!window.MJSync) window.MJ_START();
+</script>
+</body>
+</html>

@@ -1,0 +1,1483 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahjuris</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="fonts.css">
+<script src="baralhos.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d4f7a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mahjuris">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="description" content="Mahjuris: estude para concursos jogando. Junte cada pergunta com a sua resposta.">
+<!-- mahjuris-sync -->
+<script src="config.js"></script>
+<script src="lib/supabase.js"></script>
+<script src="sync.js"></script>
+<script src="plan.js"></script>
+<style>
+/* Layout: mesa de estudo em ardósia; peças de marfim empilhadas em camadas, leitor da peça embaixo. */
+:root{
+  --bg:#e4ebea; --panel:#f6f9f8; --fg:#15242a; --muted:#56696e; --line:#c3cfcf;
+  --ink:#1d4f7a; --ox:#8c2d2a; --ok:#2c7a4d; --err:#b3261e; --hint:#c98a12;
+  --tile:#fbf8f0; --tile-edge:#c9bc9f; --tile-fg:#1c2326; --tile-shadow:rgba(20,35,40,.28);
+  --felt:#cfdad9;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif;
+  --f-tile:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e191d; --panel:#15242a; --fg:#e2ebec; --muted:#93a7ac; --line:#2a3d43;
+  --ink:#86b6e4; --ox:#e7948a; --ok:#6fcf97; --err:#ff8a80; --hint:#f2c14e;
+  --tile:#eee7d8; --tile-edge:#8f8268; --tile-fg:#1c2326; --tile-shadow:rgba(0,0,0,.55);
+  --felt:#13252b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e191d; --panel:#15242a; --fg:#e2ebec; --muted:#93a7ac; --line:#2a3d43;
+  --ink:#86b6e4; --ox:#e7948a; --ok:#6fcf97; --err:#ff8a80; --hint:#f2c14e;
+  --tile:#eee7d8; --tile-edge:#8f8268; --tile-fg:#1c2326; --tile-shadow:rgba(0,0,0,.55);
+  --felt:#13252b; color-scheme:dark}
+/* tile labels stay dark-on-ivory in both themes */
+:root{--t-ink:#1d4f7a; --t-ox:#8c2d2a}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 18px}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:2rem;letter-spacing:-.02em;margin:0;line-height:1}
+.brand h1 span{color:var(--ox)}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 .9rem var(--f-body);padding:7px 14px;border-radius:7px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+select,input[type=text],textarea{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;max-width:100%}
+textarea{resize:vertical;min-height:64px;width:100%}
+.btn{font:600 .9rem var(--f-body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.btn.danger{color:var(--err)}
+.btn.small{padding:5px 10px;font-size:.82rem}
+.btn:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--hint);outline-offset:2px}
+.stats{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.88rem;color:var(--muted);align-items:center}
+.stats b{color:var(--fg);font-variant-numeric:tabular-nums;font-size:1rem}
+.stats .lives b{color:var(--err)}
+.phasebar{display:flex;flex-direction:column;gap:6px}
+.phase-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+.phase-n{font-family:var(--f-display);font-weight:800;font-size:1.5rem;letter-spacing:-.01em}
+.phase-meta{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--ok);border-radius:99px;transition:width .5s}
+.dialog .meter{margin-top:2px}
+.banner{background:var(--panel);border:1px solid var(--hint);border-radius:10px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.board-scroll{overflow-x:auto;background:var(--felt);border-radius:16px;padding:14px 10px}
+.board{position:relative;margin:0 auto}
+.tile{position:absolute;border:0;padding:0;background:none;cursor:pointer;font:inherit;text-align:left}
+.tile .face{position:absolute;inset:2px;border-radius:9px;background:var(--tile);color:var(--tile-fg);
+  box-shadow:3px 4px 0 var(--tile-edge),4px 7px 10px var(--tile-shadow);
+  padding:6px 7px 6px 8px;display:flex;flex-direction:column;gap:3px;overflow:hidden;transition:transform .12s,box-shadow .12s,filter .2s}
+.tile .kind{display:flex;align-items:center;gap:4px;font:600 .53rem/1.3 var(--f-body);letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.tile.up .face{box-shadow:3px 4px 0 var(--tile-edge),6px 10px 14px var(--tile-shadow)}
+.tile .kind i{width:7px;height:7px;border-radius:50%;flex:none}
+.tile.front .kind{color:var(--t-ink)} .tile.front .kind i{background:var(--t-ink)}
+.tile.back .kind{color:var(--t-ox)} .tile.back .kind i{background:var(--t-ox);border-radius:1px;transform:rotate(45deg)}
+.tile .txt{font-family:var(--f-tile);font-weight:500;line-height:1.18;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;overflow-wrap:break-word;hyphens:auto}
+.tile.blocked .face{filter:brightness(.86) saturate(.8)}
+.tile:hover:not(.blocked) .face{transform:translate(-1px,-2px)}
+.tile.sel .face{box-shadow:0 0 0 3px var(--ink),3px 4px 0 var(--tile-edge),4px 7px 10px var(--tile-shadow);transform:translate(-1px,-3px)}
+.tile.cand .face{box-shadow:0 0 0 3px var(--hint),3px 4px 0 var(--tile-edge),4px 7px 10px var(--tile-shadow);animation:pulse 1s ease-in-out infinite}
+.tile.wrong .face{box-shadow:0 0 0 3px var(--err),3px 4px 0 var(--tile-edge);animation:shake .4s}
+.tile.stuck .face{animation:nudge .3s}
+.tile.gone{pointer-events:none}
+.tile.gone .face{opacity:0;transform:scale(.7) translateY(-10px);transition:opacity .35s,transform .35s}
+@keyframes shake{0%,100%{translate:0}25%{translate:-5px}75%{translate:5px}}
+@keyframes nudge{0%,100%{translate:0}50%{translate:0 -3px}}
+@keyframes pulse{50%{filter:brightness(1.06)}}
+@media (prefers-reduced-motion:reduce){.tile .face,.tile.gone .face{transition:none;animation:none!important}}
+.reader{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-height:76px;display:flex;flex-direction:column;gap:4px}
+.reader .rk{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;font-weight:600;color:var(--muted)}
+.reader .rt{font-size:1.02rem;max-width:70ch}
+.reader.ok .rk{color:var(--ok)} .reader.bad .rk{color:var(--err)}
+.overlay{position:fixed;inset:0;background:rgba(10,20,24,.55);display:flex;align-items:center;justify-content:center;z-index:50;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dialog{background:var(--panel);color:var(--fg);border-radius:16px;padding:22px;max-width:520px;width:100%;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.dialog h2{font-family:var(--f-display);font-size:1.6rem;margin:0;text-wrap:balance}
+.dialog ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+.dialog .row{display:flex;flex-wrap:wrap;gap:8px}
+.assume{font-size:.84rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.assume summary{cursor:pointer;font-weight:600;color:var(--fg)}
+.assume ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+/* deck editor */
+.decks{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:16px;align-items:start}
+@media (max-width:720px){.decks{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel h2{font-family:var(--f-display);font-size:1.15rem;margin:0}
+.decklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.decklist button{width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--fg);font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.decklist button[aria-current="true"]{border-color:var(--ink);background:var(--bg)}
+.decklist small{color:var(--muted);font-variant-numeric:tabular-nums}
+.pairs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pairs li{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:.9rem}
+.pairs li .f{color:var(--ink)} .pairs li .b{color:var(--ox)}
+.pairs li .t{display:block;font-size:.66rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+@media (max-width:560px){.pairs li{grid-template-columns:1fr}}
+.pairs li .pacts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tagx{font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 8px}
+.cmp{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.9rem}
+.cmp .t{font-size:.66rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.cmp del{color:var(--err)} .cmp ins{color:var(--ok);text-decoration:none;font-weight:600}
+.undo{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;max-width:calc(100% - 32px);width:max-content;background:var(--fg);color:var(--bg);border-radius:10px;padding:10px 12px 10px 16px;font-size:.9rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.undo[hidden]{display:none}
+.undo .btn{background:transparent;color:var(--bg);border-color:currentColor}
+.addgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.addgrid{grid-template-columns:1fr}}
+.note{font-size:.84rem;color:var(--muted);margin:0}
+.imp{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.imp.imp-top{border-top:0;padding-top:0;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:4px}
+.imp input.filein{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.filebtn{align-self:flex-start;display:inline-block}
+.imp input.filein:focus-visible+.filebtn,.filebtn:focus-within{outline:2px solid var(--ink)}
+.impdeck{display:flex;align-items:center;gap:8px;font-size:.88rem;cursor:pointer}
+.impdeck span{flex:1;min-width:0}
+.note.warn{color:var(--err);padding-left:26px}
+.impdeck small{color:var(--muted);font-variant-numeric:tabular-nums}
+.msg{font-size:.85rem;color:var(--ok);min-height:1.2em;margin:0}
+.timer{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-variant-numeric:tabular-nums}
+.timer .tm-clock{font:800 1.15rem/1 var(--f-display);letter-spacing:.02em}
+.timer.paused .tm-clock{color:var(--muted)}
+.timer .tm-total{color:var(--muted);font-size:.85rem;flex:1;min-width:0}
+.tempo{display:flex;flex-direction:column;gap:12px}
+.tempo h3{margin:0;font:800 1.25rem var(--f-display)}
+.menu{flex-direction:column;gap:14px}
+.menupanel{display:flex;flex-direction:column;gap:12px;max-width:560px;width:100%}
+.menupanel h2{margin:0;font:800 1.3rem var(--f-display)}
+.menupanel select{width:100%}
+.btn.big{padding:12px 20px;font-size:1.02rem}
+.menubtns{display:flex;gap:8px;flex-wrap:wrap}
+.gamebar{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;justify-content:space-between}
+.gamebar .timer{flex:1;min-width:0;flex-direction:column;align-items:flex-start;gap:2px}
+.gamebar .tm-total{font-size:.78rem}
+.gbtns{display:flex;gap:6px}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;min-width:36px}
+.timer.concealed .tm-clock,.timer.concealed .tm-total{visibility:hidden}
+.timer.concealed::before{content:"Cronômetro oculto";color:var(--muted);font-size:.8rem;position:absolute}
+.gamebar .timer{position:relative}
+.boardwrap{position:relative}
+.boardwrap .board-scroll{isolation:isolate}
+.editzone{display:flex;justify-content:flex-end;margin-top:40px;min-height:1px}
+.editzone .redit{background:transparent;border-style:dashed;color:var(--muted)}
+.editform{display:flex;flex-direction:column;gap:10px}
+.editform textarea{min-height:84px}
+.pausecover{position:absolute;inset:0;border-radius:16px;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50}
+.pausecover[hidden]{display:none}
+.pausecover p{font:800 1.4rem var(--f-display);margin:0}
+.statlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.statlist li{display:flex;flex-direction:column;gap:4px}
+.statlist .st-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.statlist .st-pct{font:800 1.2rem/1 var(--f-display);font-variant-numeric:tabular-nums}
+.statlist .st-sub{color:var(--muted);font-size:.84rem;font-variant-numeric:tabular-nums}
+.st-mat>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.st-mat>summary::-webkit-details-marker{display:none}
+.st-mat>summary .st-top strong::after{content:" ▾";color:var(--muted);font-weight:400}
+.st-mat[open]>summary .st-top strong::after{content:" ▴"}
+.st-tops{margin:12px 0 4px 10px;padding-left:12px;border-left:2px solid var(--line)}
+.st-tops .st-pct{font-size:1rem}
+.st-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.st-export{margin:0 0 12px}
+.st-matreset{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+.st-subs summary{cursor:pointer;font-size:.84rem;color:var(--muted);margin-top:4px}
+.st-sublist{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:.82rem}
+.st-sublist li{display:flex;justify-content:space-between;gap:10px;flex-direction:row}
+.st-sublist li b{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.st-sublist li.bad b{color:var(--err)}
+.statlist li.tot{border-top:1px solid var(--line);padding-top:12px}
+</style>
+
+<div class="wrap" lang="pt-BR">
+  <header class="top" id="hdr">
+    <div class="brand"><h1>Mah<span>juris</span></h1><p>Estude jogando. Junte cada pergunta com a sua resposta.</p></div>
+    <div class="tabs" role="group" aria-label="Seção">
+      <button id="tab-play" aria-pressed="true">Jogar</button>
+      <button id="tab-decks" aria-pressed="false">Baralhos</button>
+      <button id="tab-stats" aria-pressed="false">Estatísticas</button>
+    </div>
+  </header>
+
+  <section id="view-menu" class="menu">
+    <div class="panel menupanel">
+      <h2>Novo jogo</h2>
+      <div class="field"><label for="sel-mat">Matéria</label><select id="sel-mat"></select></div>
+      <div class="field"><label for="sel-deck">Assunto</label><select id="sel-deck"></select></div>
+      <div class="phasebar">
+        <div class="phase-head"><span class="phase-n" id="ph-n">Fase 1</span><span class="phase-meta" id="ph-meta"></span></div>
+        <div class="meter" role="progressbar" aria-label="Baralho dominado" aria-valuemin="0" aria-valuemax="100" id="ph-meter"><i id="ph-fill"></i></div>
+      </div>
+      <div class="field"><label for="sel-size">Quantidade de cartas</label>
+        <select id="sel-size"><option value="6">6 pares (12 peças)</option><option value="10" selected>10 pares (20 peças)</option><option value="15">15 pares (30 peças)</option><option value="20">20 pares (40 peças)</option></select></div>
+      <div class="field"><label for="sel-mode">Modo de estudo</label>
+        <select id="sel-mode"><option value="iniciante">Iniciante (com dicas)</option><option value="normal" selected>Normal</option><option value="avancado">Avançado (3 erros)</option></select></div>
+      <div class="field"><label for="sel-stack">Tipo de tabuleiro</label>
+        <select id="sel-stack"><option value="1" selected>Empilhado (camadas de mahjong)</option><option value="0">Plano</option></select></div>
+      <p class="note" id="saved-note" hidden></p>
+      <div class="menubtns"><button class="btn primary big" id="btn-play" type="button">Jogar</button><button class="btn danger" id="btn-discard-saved" type="button" hidden>Descartar jogo salvo</button><button class="btn" id="btn-review" type="button" hidden>Revisar</button></div>
+      <p class="note" id="review-note" hidden></p>
+    </div>
+      <details class="assume">
+        <summary>Regras do jogo</summary>
+        <ul>
+          <li>As peças são empilhadas em até quatro camadas, com a regra de peça livre do mahjong. Dá para trocar para tabuleiro plano no seletor.</li>
+          <li>Cada baralho é jogado em fases. Uma fase reúne os pares errados na fase anterior e completa com pares ainda não vistos. Um par está dominado quando você acerta sem errar; o baralho termina quando todos estão dominados.</li>
+          <li>Conta como erro o par da peça que você escolheu primeiro. O tabuleiro é sempre montado de forma que tenha solução.</li>
+          <li>Errar não remove as peças. O progresso e os baralhos ficam salvos até você excluir ou zerar.</li>
+          <li>Cada rodada tem só pares completos: nenhuma peça sobra no fim. Para não dar para acertar no chute, a rodada junta pares parecidos entre si (mesmo tema, prazos e números próximos).</li>
+          <li>No modo iniciante, ao escolher uma peça, três opções brilham por alguns segundos e uma delas é a certa.</li>
+          <li>Ao importar do Anki, o 1º campo vira uma peça e o 2º vira a peça par. Se a nota tiver um campo "Tipo" (como nos baralhos Mahjuris), ele define o rótulo da peça. Baralhos de certo ou errado vêm desmarcados.</li>
+          <li>Respostas com texto idêntico (por exemplo, duas perguntas cuja resposta é "10 dias") valem para qualquer uma delas.</li>
+        </ul>
+      </details>
+      <p class="note" style="margin:0">O Mahjuris é um app independente, sem vínculo com órgãos públicos ou bancas de concurso. Textos de lei vêm de fontes oficiais (planalto.gov.br e sites das assembleias legislativas). Confira sempre a redação vigente.</p>
+  </section>
+
+  <section id="view-play" hidden style="display:none;flex-direction:column;gap:12px">
+    <div class="gamebar">
+      <div class="timer paused" id="timer" role="timer" aria-label="Tempo de estudo nesta fase"><span class="tm-clock" id="tm-phase">00:00</span><span class="tm-total" id="tm-total"></span></div>
+      <div class="gbtns"><button class="btn small iconbtn" id="btn-eye" type="button"></button><button class="btn small iconbtn" id="btn-fs" type="button"></button><button class="btn small" id="tm-btn" type="button" disabled>Pausar</button><button class="btn small" id="btn-exit" type="button">Sair</button></div>
+    </div>
+    <div class="stats" aria-live="polite">
+      <span id="g-phase">Fase 1</span>
+      <span>Pares restantes <b id="st-left">0</b></span>
+      <span hidden>Acertos <b id="st-ok">0</b></span>
+      <span hidden>Erros <b id="st-err">0</b></span>
+      <span class="lives" id="st-lives-wrap" hidden>Vidas <b id="st-lives">3</b></span>
+      <span id="st-dec-wrap">Respostas sem par <b id="st-dec">0</b></span>
+    </div>
+    <div class="banner" id="stuck" hidden>
+      <span>Nenhum par está livre agora. Embaralhe as peças que sobraram para continuar.</span>
+      <button class="btn small" id="btn-shuffle">Embaralhar</button>
+    </div>
+    <div class="boardwrap"><div class="board-scroll" id="board-scroll"><div class="board" id="board"></div></div>
+      <div class="pausecover" id="pausecover" hidden><p>Jogo pausado</p><button class="btn primary big" id="btn-resume" type="button">Retomar</button></div></div>
+    <div class="reader" id="reader" aria-live="polite">
+      <span class="rk" id="r-kind">Como jogar</span>
+      <span class="rt" id="r-text">Toque numa peça livre e depois na peça que responde a ela. Uma peça está livre quando nada está em cima dela e um dos lados (esquerdo ou direito) está vazio. Peças presas ficam mais escuras.</span>
+    </div>
+    <div class="editzone"><button class="btn small redit" id="btn-edit" type="button" hidden>Editar carta</button></div>
+  </section>
+
+  <section id="view-stats" hidden>
+    <div class="panel tempo" id="tempo-box"></div>
+  </section>
+
+  <section id="view-decks" hidden>
+    <div class="decks">
+      <div class="panel">
+        <h2>Seus baralhos</h2>
+        <div class="imp imp-top">
+          <div class="field"><label for="imp-file">Carregar baralho de arquivo</label><input type="file" id="imp-file" accept=".xlsx,.xlsm,.xls,.csv,.tsv,.txt,.apkg,.colpkg" class="filein"></div>
+          <label for="imp-file" class="btn primary filebtn">Carregar arquivo (Excel, CSV ou Anki)</label>
+          <p class="note">Planilha do Excel (.xlsx) ou CSV: uma carta por linha, com as colunas pergunta e resposta (ou carta_a e carta_b). As colunas matéria, assunto (tópico), subtópico e fundamento são opcionais. Anki (.apkg): a frente vira uma peça e o verso, a peça par; cada subbaralho vira um baralho.</p>
+          <p class="msg" id="imp-msg" aria-live="polite"></p>
+          <div id="imp-preview" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <ul class="decklist" id="decklist"></ul>
+        <div class="field" style="border-top:1px solid var(--line);padding-top:12px"><label for="new-deck-name">Novo baralho</label><input type="text" id="new-deck-name" placeholder="Ex.: Lei 10.990/97"></div>
+        <button class="btn" id="btn-create-deck">Criar baralho vazio</button>
+        <p class="note" id="sync-note">Salvando neste navegador.</p>
+      </div>
+      <div class="panel" id="deck-detail"></div>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title"></div></div>
+
+<script>
+window.MJ_START=function(){
+const $=id=>document.getElementById(id);
+const TYPES={
+  pergunta:["Pergunta","Resposta"], lei:["Lei","Assunto"], artigo:["Artigo","Conteúdo"],
+  conceito:["Conceito","Definição"], palavra:["Palavra","Significado"], anki:["Frente","Verso"]
+};
+const SAMPLE={id:"exemplo-direito",name:"Direito: exemplos",builtin:true,pairs:[
+ ["pergunta","Quantum necessário para o livramento condicional em crime hediondo?","Mais de 2/3 da pena, se não for reincidente específico (CP, art. 83, V)."],
+ ["pergunta","Prazo para conclusão do inquérito policial com indiciado preso?","10 dias (CPP, art. 10)."],
+ ["pergunta","Prazo para conclusão do inquérito policial com indiciado solto?","30 dias (CPP, art. 10)."],
+ ["pergunta","Quem são considerados militares estaduais?","Os integrantes da Brigada Militar e do Corpo de Bombeiros Militar."],
+ ["lei","Lei Complementar 10.990/97 (RS)","Estatuto dos Servidores Militares da Brigada Militar do RS."],
+ ["lei","Lei 8.072/90","Lei dos Crimes Hediondos."],
+ ["lei","Lei 11.343/06","Lei de Drogas (Sisnad)."],
+ ["lei","Lei 11.340/06","Lei Maria da Penha: violência doméstica e familiar contra a mulher."],
+ ["lei","Lei 13.869/19","Lei de Abuso de Autoridade."],
+ ["lei","Lei 8.069/90","Estatuto da Criança e do Adolescente (ECA)."],
+ ["conceito","Flagrante próprio","Quem está cometendo a infração penal ou acaba de cometê-la (CPP, art. 302, I e II)."],
+ ["conceito","Flagrante impróprio (quase flagrante)","Quem é perseguido, logo após, em situação que faça presumir ser o autor (CPP, art. 302, III)."],
+ ["conceito","Flagrante presumido (ficto)","Quem é encontrado, logo depois, com instrumentos, armas, objetos ou papéis que façam presumir ser o autor (CPP, art. 302, IV)."],
+ ["palavra","Prevaricação","Retardar ou deixar de praticar, indevidamente, ato de ofício, ou praticá-lo contra a lei, para satisfazer interesse ou sentimento pessoal (CP, art. 319)."],
+ ["palavra","Peculato","Funcionário público se apropria de dinheiro, valor ou bem de que tem a posse em razão do cargo, ou o desvia (CP, art. 312)."],
+ ["palavra","Concussão","Exigir, para si ou para outrem, vantagem indevida em razão da função (CP, art. 316)."],
+ ["palavra","Corrupção passiva","Solicitar ou receber vantagem indevida, ou aceitar promessa dela, em razão da função (CP, art. 317)."],
+ ["artigo","CF, art. 5º, LVII","Ninguém será considerado culpado até o trânsito em julgado de sentença penal condenatória."],
+ ["pergunta","Idade mínima para concorrer a Presidente da República?","35 anos (CF, art. 14, § 3º, VI, a)."],
+ ["pergunta","Prazo da prisão temporária em crime hediondo?","30 dias, prorrogável por igual período em caso de extrema e comprovada necessidade."]
+].map((p,i)=>({id:"s"+(i+1),type:p[0],front:p[1],back:p[2]}))};
+
+/* ---------- storage: navegador + (se disponível) conta ---------- */
+const LS="mahjuris.decks.v1";
+let decks=[];
+function lsRead(){try{const v=JSON.parse(localStorage.getItem(LS)||"[]");return Array.isArray(v)?v:[]}catch(e){return []}}
+function lsWrite(){try{localStorage.setItem(LS,JSON.stringify(decks))}catch(e){}}
+decks=lsRead();
+let remote=null; // {col}
+// Um baralho grande é guardado em partes: documento principal {name, updatedAt, chunks} + documentos "<id>__<n>" com {pairs}.
+function chunkPairs(pairs){
+  const out=[]; let cur=[], size=0;
+  for(const p of pairs){ const s=JSON.stringify(p).length; if(cur.length&&size+s>150000){out.push(cur);cur=[];size=0} cur.push(p); size+=s; }
+  if(cur.length||!out.length) out.push(cur); return out;
+}
+async function initRemote(){
+  try{
+    if(!window.claude||!window.claude.use) return;
+    const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
+    if(!db||!user) return;
+    const id=await user.id(); if(!id) return;
+    const col=db.collection("data/users/"+id);
+    const snap=await Promise.race([col.get(),new Promise((_,r)=>setTimeout(()=>r(new Error("timeout")),10000))]);
+    const docs=new Map(snap.docs.map(s=>[s.id,s.data()||{}]));
+    const byId=new Map(decks.map(d=>[d.id,d]));
+    const remoteIds=new Set();
+    for(const [k,d] of docs){
+      if(k.startsWith("prog__")){ const id=k.slice(6), cur=PROG[id]; if(!cur||(d.updatedAt||0)>(cur.updatedAt||0)) PROG[id]={phase:d.phase||1,mastered:d.mastered||[],review:d.review||[],current:d.current||null,updatedAt:d.updatedAt||0}; continue; }
+      if(k.includes("__")) continue;
+      let pairs=Array.isArray(d.pairs)?d.pairs:null;
+      if(!pairs&&typeof d.chunks==="number"){ pairs=[]; for(let i=0;i<d.chunks;i++){const c=docs.get(k+"__"+i); if(c&&Array.isArray(c.pairs)) pairs.push(...c.pairs)} }
+      if(!pairs) continue;
+      remoteIds.add(k);
+      const cur=byId.get(k);
+      if(!cur||(d.updatedAt||0)>=(cur.updatedAt||0)) byId.set(k,{id:k,name:String(d.name||"Sem nome"),pairs,updatedAt:d.updatedAt||0,chunks:d.chunks||0});
+      else cur.chunks=d.chunks||0;
+    }
+    remote={col};
+    const merged=[...byId.values()];
+    for(const d of merged){ if(!remoteIds.has(d.id)) await saveRemote(d); }
+    decks=merged; lsWrite();
+    try{localStorage.setItem(LSP,JSON.stringify(PROG))}catch(e){}
+    for(const id of Object.keys(PROG)) if(!docs.has("prog__"+id)) saveProg(id);
+    if(!G) renderMenu();
+    $("sync-note").textContent="Salvando na sua conta e neste navegador.";
+    renderDeckSelect(); renderDecks();
+  }catch(e){}
+}
+const writeChain=new Map();
+function queued(id,fn){const p=(writeChain.get(id)||Promise.resolve()).then(fn).catch(()=>{}); writeChain.set(id,p); return p}
+function saveRemote(d){
+  if(!remote) return Promise.resolve();
+  return queued(d.id,async()=>{
+    const parts=chunkPairs(d.pairs), old=d.chunks||0;
+    for(let i=0;i<parts.length;i++) await remote.col.doc(d.id+"__"+i).set({pairs:parts[i]});
+    for(let i=parts.length;i<old;i++) await remote.col.doc(d.id+"__"+i).delete();
+    await remote.col.doc(d.id).set({name:d.name,updatedAt:d.updatedAt||Date.now(),chunks:parts.length});
+    d.chunks=parts.length;
+  });
+}
+function deleteRemote(d){
+  if(!remote) return;
+  queued(d.id,async()=>{ await remote.col.doc(d.id).delete(); for(let i=0;i<(d.chunks||0);i++) await remote.col.doc(d.id+"__"+i).delete(); });
+}
+/* ---------- progresso por baralho (fases) ---------- */
+const LSP="mahjuris.progress.v1";
+let PROG={};
+try{const v=JSON.parse(localStorage.getItem(LSP)||"{}"); if(v&&typeof v==="object") PROG=v}catch(e){}
+function prog(id){ if(!PROG[id]) PROG[id]={phase:1,mastered:[],review:[],current:null,updatedAt:0}; return PROG[id]; }
+function saveProg(id){
+  const P=prog(id); P.updatedAt=Date.now();
+  try{localStorage.setItem(LSP,JSON.stringify(PROG))}catch(e){}
+  if(remote) queued("prog__"+id,()=>remote.col.doc("prog__"+id).set({phase:P.phase,mastered:P.mastered,review:P.review,current:P.current||null,updatedAt:P.updatedAt}));
+}
+function dropProg(id){ delete PROG[id]; try{localStorage.setItem(LSP,JSON.stringify(PROG))}catch(e){} if(remote) queued("prog__"+id,()=>remote.col.doc("prog__"+id).delete()); }
+function deckStatus(deck){
+  const P=prog(deck.id), ids=new Set(deck.pairs.map(p=>p.id));
+  const mastered=P.mastered.filter(x=>ids.has(x)).length, review=P.review.filter(x=>ids.has(x)).length;
+  return {phase:P.phase,mastered,review,total:deck.pairs.length,done:deck.pairs.length>0&&mastered===deck.pairs.length};
+}
+function phasePairs(deck,size){
+  const P=prog(deck.id), byId=new Map(deck.pairs.map(p=>[p.id,p]));
+  if(Array.isArray(P.current)&&P.current.length&&P.current.every(x=>byId.has(x))) return P.current.map(x=>byId.get(x));
+  const m=new Set(P.mastered), rv=P.review.filter(x=>byId.has(x));
+  const fresh=shuffle(deck.pairs.filter(p=>!m.has(p.id)&&!rv.includes(p.id)));
+  const rvP=rv.slice(0,size).map(x=>byId.get(x));
+  const pick=[...rvP,...pickSimilar(fresh,rvP,size-rvP.length)];
+  P.current=pick.map(p=>p.id); saveProg(deck.id);
+  return pick;
+}
+function renderPhase(){
+  const deck=deckById($("sel-deck").value), st=deckStatus(deck);
+  $("ph-n").textContent=st.done?"Baralho estudado":"Fase "+st.phase;
+  $("ph-meta").textContent=st.mastered+" de "+st.total+" pares dominados"+(st.review?" · "+st.review+" para revisar":"");
+  const pct=st.total?Math.round(st.mastered/st.total*100):0;
+  $("ph-fill").style.width=pct+"%"; $("ph-meter").setAttribute("aria-valuenow",pct);
+}
+function persist(d){ d.updatedAt=Date.now(); lsWrite(); saveRemote(d); }
+/* baralhos de fábrica: assets/baralhos.js (gerado por gerar_baralhos.py) */
+const BUILTIN=(window.MJ_BUILTIN||[]).map(d=>({...d,builtin:true}));
+const LSE="mahjuris.edits.v1";
+let EDITS={}; try{EDITS=JSON.parse(localStorage.getItem(LSE)||"{}")||{}}catch(e){EDITS={}}
+function applyEdits(list){ list.forEach(d=>d.pairs.forEach(p=>{const e=EDITS[p.id]; if(e){ if(p._of==null){p._of=p.front; p._ob=p.back;} p.front=e.front; p.back=e.back; }})); }
+applyEdits(BUILTIN); applyEdits([SAMPLE]);
+const LSX="mahjuris.extra.v1";
+let EXTRA={}; try{EXTRA=JSON.parse(localStorage.getItem(LSX)||"{}")||{}}catch(e){EXTRA={}}
+[...BUILTIN,SAMPLE].forEach(d=>{(EXTRA[d.id]||[]).forEach(p=>{p.extra=true; const i=d.pairs.findIndex(x=>x.id===p.after); if(i>=0) d.pairs.splice(i+1,0,p); else d.pairs.push(p)})});
+function saveExtra(){try{localStorage.setItem(LSX,JSON.stringify(EXTRA))}catch(e){}}
+function saveEdits(){try{localStorage.setItem(LSE,JSON.stringify(EDITS))}catch(e){}}
+const FIRST=BUILTIN[0]||SAMPLE;
+function allDecks(){return [...BUILTIN,SAMPLE,...decks]}
+const TEMPD=new Map();
+function deckById(id){return TEMPD.get(id)||allDecks().find(d=>d.id===id)||FIRST}
+function wrongPairs(d){return d.pairs.filter(p=>{const x=DST.pairs[p.id]; return x&&x.err>0&&x.last===0})}
+/* ---------- estatísticas por matéria (grupo do baralho): tempo de estudo e aproveitamento ---------- */
+const LST="mahjuris.stats.v1";
+let STATS={}; try{STATS=JSON.parse(localStorage.getItem(LST)||"{}")||{}}catch(e){STATS={}}
+const T={run:false,last:0,phase:0,mat:null,iv:null,wasRun:false,saved:0};
+function materiaDe(d){return d.group||d.name}
+function stat(m){return STATS[m]||(STATS[m]={ms:0,ok:0,err:0,fases:0})}
+const LSD="mahjuris.dstats.v1";
+let DST={decks:{},pairs:{}}; try{const v=JSON.parse(localStorage.getItem(LSD)||"null"); if(v&&v.decks&&v.pairs) DST=v}catch(e){}
+function dstat(id){return DST.decks[id]||(DST.decks[id]={ms:0,ok:0,err:0,fases:0})}
+function pstat(id){return DST.pairs[id]||(DST.pairs[id]={ok:0,err:0,last:1})}
+function statIdOf(d){return d.statId||d.id}
+function emptySess(){return {ms:0,ok:0,err:0,p:{}}}
+const LSR="mahjuris.srs.v1", SRS_DAYS=[1,3,7,15,30];
+let SRS={}; try{SRS=JSON.parse(localStorage.getItem(LSR)||"{}")||{}}catch(e){SRS={}}
+function srsSave(){try{localStorage.setItem(LSR,JSON.stringify(SRS))}catch(e){}}
+function dayAt(n){const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()+n).getTime()}
+function srsUpdate(id,e,deckId){
+  const x=SRS[id], now=Date.now();
+  if(e[1]>0){ SRS[id]={b:0,due:dayAt(SRS_DAYS[0]),deck:deckId}; return; }
+  if(x&&e[0]>0&&x.due<=now){ const b=x.b+1; if(b>=SRS_DAYS.length) delete SRS[id]; else SRS[id]={b,due:dayAt(SRS_DAYS[b]),deck:x.deck||deckId}; }
+}
+function srsOf(d){ const now=Date.now(), due=[], later=[]; d.pairs.forEach(p=>{const x=SRS[p.id]; if(!x) return; (x.due<=now?due:later).push(p)});
+  const next=later.length?Math.min(...later.map(p=>SRS[p.id].due)):null; return {due,later,next}; }
+function whenT(t){ const days=Math.round((t-dayAt(0))/864e5); const dt=new Date(t).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}); return days<=1?"amanhã ("+dt+")":"em "+days+" dias ("+dt+")"; }
+function tSave(){try{localStorage.setItem(LST,JSON.stringify(STATS)); localStorage.setItem(LSD,JSON.stringify(DST))}catch(e){}}
+function statHit(ok,pr){ if(!G) return; if(ok) G.sess.ok++; else G.sess.err++;
+  if(pr){ const q=G.sess.p||(G.sess.p={}), e=q[pr.id]||(q[pr.id]=[0,0,1]); if(ok){e[0]++; e[2]=1} else {e[1]++; e[2]=0} }
+  saveBoard(); tRender(); }
+function commitSess(){ if(!G||!G.sess) return; const dk=deckById(G.deckId), s=stat(materiaDe(dk)), ds=dstat(statIdOf(dk));
+  s.ms+=G.sess.ms; s.ok+=G.sess.ok; s.err+=G.sess.err; ds.ms+=G.sess.ms; ds.ok+=G.sess.ok; ds.err+=G.sess.err;
+  const sid=statIdOf(dk); Object.entries(G.sess.p||{}).forEach(([id,e])=>{const ps=pstat(id); ps.ok+=e[0]; ps.err+=e[1]; ps.last=e[2]; if(e[0]+e[1]) ps.t=Date.now(); srsUpdate(id,e,sid)}); srsSave();
+  G.sess=emptySess(); tSave(); }
+function shownStat(m){ const s=stat(m), x=(G&&G.sess&&materiaDe(deckById(G.deckId))===m)?G.sess:{ms:0,ok:0,err:0}; return {ms:s.ms+x.ms,ok:s.ok+x.ok,err:s.err+x.err,fases:s.fases} }
+function snapshot(){ if(!G||G.over) return null;
+  return {phase:G.phase,mode:G.mode,cols:G.cols,lives:G.lives,ok:G.ok,err:G.err,missed:[...G.missed.keys()],ms:T.phase,sess:{...G.sess},
+    tiles:G.tiles.map(t=>{const {pair,alive,id,...pos}=t; return {...pos,p:pair.id,a:alive?1:0}})} }
+function saveBoard(){ const s=snapshot(); if(!s) return; prog(G.deckId).board=s; saveProg(G.deckId); }
+function restoreGame(deck){
+  const P=prog(deck.id), S=P.board, byId=new Map(deck.pairs.map(p=>[p.id,p]));
+  if(!S||!Array.isArray(S.tiles)||!S.tiles.every(t=>byId.has(t.p))){ P.board=null; saveProg(deck.id); return false; }
+  const tiles=S.tiles.map((t,i)=>{const {p,a,...pos}=t; return {...pos,pair:byId.get(p),alive:!!a,id:"t"+i}});
+  const pairs=[...new Map(tiles.filter(t=>!t.decoy).map(t=>[t.pair.id,t.pair])).values()];
+  G={deckId:deck.id,phase:S.phase,pairs,tiles,cols:S.cols,sel:null,ok:S.ok,err:S.err,missed:new Map((S.missed||[]).filter(id=>byId.has(id)).map(id=>[id,byId.get(id)])),mode:S.mode,lives:S.lives,over:false,hintTimer:null,sess:S.sess||emptySess()};
+  $("st-lives-wrap").hidden=G.mode!=="avancado"; edTarget=null; $("btn-edit").hidden=true;
+  hideOverlay(); showReader("Jogo retomado","Você voltou para a fase "+G.phase+" de onde parou.");
+  renderBoard(); updateStats();
+  tPause(); T.user=false; T.mat=materiaDe(deck); T.phase=S.ms||0; tStart();
+  return true;
+}
+function pctT(s){const n=s.ok+s.err; return n?Math.round(s.ok/n*100):null}
+function tTick(){
+  if(!T.run) return;
+  const now=Date.now(), dt=Math.max(0,Math.min(now-T.last,5000)); T.last=now;
+  T.phase+=dt; if(G&&G.sess) G.sess.ms+=dt;
+  if(now-T.saved>5000){T.saved=now; tSave()}
+  tRender();
+}
+function tStart(){ if(T.run||!T.mat||!G||G.over) return; T.run=true; T.last=Date.now(); T.iv=setInterval(tTick,1000); tRender(); }
+function tPause(){ if(T.run){ tTick(); T.run=false; clearInterval(T.iv); T.iv=null; tSave(); } tRender(); }
+function tNewPhase(deck){ tPause(); T.user=false; T.mat=materiaDe(deck); T.phase=0; tStart(); }
+function userPause(){ if(!G||G.over) return; T.user=true; T.wasRun=false; tPause(); saveBoard(); }
+function userResume(){ T.user=false; tStart(); tRender(); }
+function resumeIfIdle(){ if(G&&!G.over&&!T.user&&$("overlay").hidden&&!$("view-play").hidden) tStart(); }
+function clockT(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,"0"); return (h?h+":"+p(m):p(m))+":"+p(x)}
+function durT(ms){const m=Math.floor(ms/60000),h=Math.floor(m/60); return h?h+"h "+String(m%60).padStart(2,"0")+"min":m?m+" min":Math.floor(ms/1000)+" s"}
+function tRender(){
+  const b=$("tm-btn"); if(!b) return;
+  $("tm-phase").textContent=clockT(T.phase);
+  $("pausecover").hidden=!T.user;
+  if(T.mat){const s=shownStat(T.mat), p=pctT(s); $("tm-total").textContent=T.mat+": "+durT(s.ms)+(p!=null?" · "+p+"% de acertos":"");} else $("tm-total").textContent="";
+  b.disabled=!(G&&!G.over);
+  b.textContent=T.user?"Retomar":"Pausar";
+  b.setAttribute("aria-label",T.user?"Retomar o jogo":"Pausar o jogo");
+  $("timer").classList.toggle("paused",!T.run);
+}
+function playReview(d){
+  const due=srsOf(d).due; if(!due.length) return;
+  const t={id:"rev__"+d.id,name:"Revisão: "+d.name,group:groupOf(d),builtin:true,temp:true,statId:d.id,pairs:due};
+  TEMPD.set(t.id,t); dropProg(t.id); selectDeck(t.id); startGame();
+}
+function playWhole(d){ dropProg(d.id); selectDeck(d.id); startGame(); }
+function playWrong(d){
+  const wr=wrongPairs(d); if(!wr.length) return;
+  const t={id:"erros__"+d.id,name:"Só os erros: "+d.name,group:groupOf(d),builtin:true,temp:true,statId:d.id,pairs:wr};
+  TEMPD.set(t.id,t); dropProg(t.id); selectDeck(t.id); startGame();
+}
+const OPENMAT=new Set();
+function statSnap(){ const snap=JSON.stringify({STATS,DST}); return ()=>{ const o=JSON.parse(snap); STATS=o.STATS; DST=o.DST; tSave(); tRender(); renderTempo(); }; }
+function decksOfMat(mat){ return allDecks().filter(d=>groupOf(d)===mat||materiaDe(d)===mat); }
+function resetMat(mat){
+  const u=statSnap(); delete STATS[mat];
+  decksOfMat(mat).forEach(d=>{ delete DST.decks[d.id]; d.pairs.forEach(p=>{ delete DST.pairs[p.id]; }); });
+  tSave(); tRender(); renderTempo(); offerUndo("Estatísticas de "+mat+" zeradas.",u);
+}
+/* ---------- exportar: planilha .xlsx e relatório para PDF ---------- */
+const fmtD=t=>t?new Date(t).toLocaleDateString("pt-BR"):"";
+function exportData(){
+  const now=Date.now(), idx=new Map(); allDecks().forEach(d=>d.pairs.forEach(p=>{ if(!idx.has(p.id)) idx.set(p.id,{p,d}); }));
+  const pc=s=>{const v=pctT(s); return v==null?"":v};
+  const mins=ms=>Math.round((ms||0)/6000)/10;
+  const aprov=[];
+  Object.entries(STATS).filter(([k,s])=>s.ms>=1000||s.ok||s.err).sort((a,b)=>a[0].localeCompare(b[0],"pt-BR")).forEach(([mat,s])=>{
+    aprov.push(["Matéria",mat,"","",mins(s.ms),s.ok,s.err,pc(s)]);
+    decksOfMat(mat).map(d=>[d,DST.decks[d.id]]).filter(([d,x])=>x&&(x.ok||x.err||x.ms>=1000)).sort((a,b)=>(pctT(a[1])??101)-(pctT(b[1])??101)).forEach(([d,x])=>{
+      aprov.push(["Tópico",mat,d.name,"",mins(x.ms),x.ok,x.err,pc(x)]);
+      const subs=new Map(); d.pairs.forEach(pp=>{const y=DST.pairs[pp.id]; if(!y||!(y.ok||y.err)) return; const k=pp.sub||"Outros"; const a=subs.get(k)||{ok:0,err:0}; a.ok+=y.ok; a.err+=y.err; subs.set(k,a)});
+      [...subs.entries()].sort((a,b)=>(pctT(a[1])??101)-(pctT(b[1])??101)||b[1].err-a[1].err).forEach(([k,y])=>aprov.push(["Subtópico",mat,d.name,k,"",y.ok,y.err,pc(y)]));
+    });
+  });
+  const att=[];
+  Object.entries(DST.pairs).forEach(([id,x])=>{ if(!x.err) return; const r=idx.get(id); if(!r) return; const sr=SRS[id];
+    att.push({last:x.last, row:[materiaDe(r.d),r.d.name,r.p.sub||"",r.p.front,r.p.back,x.err,x.ok,pc(x),x.last===0?"Errou":"Acertou",fmtD(x.t),sr?(sr.due<=now?"Disponível agora":fmtD(sr.due)):"Sem revisão pendente"]}); });
+  att.sort((a,b)=>(a.last===0?0:1)-(b.last===0?0:1)||b.row[5]-a.row[5]||(a.row[7]===""?101:a.row[7])-(b.row[7]===""?101:b.row[7]));
+  return {aprov,att:att.map((a,i)=>[i+1,...a.row])};
+}
+const XH_APROV=["Nível","Matéria","Tópico","Subtópico","Tempo (min)","Acertos","Erros","Aproveitamento (%)"];
+const XH_ATT=["Prioridade","Matéria","Tópico","Subtópico (artigo)","Pergunta","Resposta","Erros","Acertos","Aproveitamento (%)","Última tentativa","Data da última tentativa","Próxima revisão"];
+async function makeXlsx(sheets){
+  await loadScript(LIBS.zip); const z=new JSZip();
+  const esc=v=>String(v).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const L=i=>{let s=""; i++; while(i){const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26)} return s};
+  const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  z.file("[Content_Types].xml",H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join("")+'</Types>');
+  z.file("_rels/.rels",H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file("xl/workbook.xml",H+'<workbook '+NS+'><sheets>'+sheets.map((s,i)=>'<sheet name="'+esc(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join("")+'</sheets><definedNames>'+sheets.map((s,i)=>'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+esc(s.name)+'\'!$A$1:$'+L(s.head.length-1)+'$'+(s.rows.length+1)+'</definedName>').join("")+'</definedNames></workbook>');
+  z.file("xl/_rels/workbook.xml.rels",H+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join("")+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  z.file("xl/styles.xml",H+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+  sheets.forEach((sh,i)=>{
+    const rows=[sh.head,...sh.rows];
+    const data=rows.map((r,ri)=>'<row r="'+(ri+1)+'">'+r.map((v,ci)=>{ const ref=L(ci)+(ri+1), st=ri===0?' s="1"':(sh.wrap&&sh.wrap.includes(ci)?' s="2"':'');
+      return (typeof v==="number"&&isFinite(v))?'<c r="'+ref+'"'+st+'><v>'+v+'</v></c>':'<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+esc(v==null?"":v)+'</t></is></c>'; }).join("")+'</row>').join("");
+    const cols='<cols>'+sh.widths.map((w,ci)=>'<col min="'+(ci+1)+'" max="'+(ci+1)+'" width="'+w+'" customWidth="1"/>').join("")+'</cols>';
+    z.file("xl/worksheets/sheet"+(i+1)+".xml",H+'<worksheet '+NS+'><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+cols+'<sheetData>'+data+'</sheetData><autoFilter ref="A1:'+L(sh.head.length-1)+rows.length+'"/></worksheet>');
+  });
+  return z.generateAsync({type:"base64",compression:"DEFLATE"});
+}
+function stamp(){const d=new Date(), z=n=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())}
+function shareFile(name,mime,b64){
+  try{ if(window.MJAndroid&&window.MJAndroid.shareFile){ window.MJAndroid.shareFile(name,mime,b64); return; } }catch(e){}
+  const a=document.createElement("a"); a.href="data:"+mime+";base64,"+b64; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+}
+async function exportXlsx(){
+  try{
+    const {aprov,att}=exportData();
+    const b64=await makeXlsx([
+      {name:"Pontos de atenção",head:XH_ATT,rows:att.length?att:[["","Nenhuma carta errada registrada ainda."]],widths:[10,22,30,22,45,45,7,9,15,15,15,16],wrap:[4,5]},
+      {name:"Aproveitamento",head:XH_APROV,rows:aprov,widths:[11,26,40,26,12,10,8,18]}]);
+    shareFile("mahjuris-estatisticas-"+stamp()+".xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",b64);
+    offerUndo("Planilha gerada: "+att.length+(att.length===1?" ponto de atenção.":" pontos de atenção."),null);
+  }catch(e){ offerUndo("Não consegui gerar a planilha.",null); }
+}
+function reportHtml(){
+  const {aprov,att}=exportData(); const e=v=>String(v==null?"":v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const tot={ms:0,ok:0,err:0}; Object.values(STATS).forEach(s=>{tot.ms+=s.ms||0; tot.ok+=s.ok; tot.err+=s.err});
+  const tbl=(head,rows,cls)=>'<table class="'+(cls||"")+'"><thead><tr>'+head.map(h=>'<th>'+e(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr class="'+(r._c||"")+'">'+r.map(v=>'<td>'+e(v)+'</td>').join("")+'</tr>').join("")+'</tbody></table>';
+  const attRows=att.map(r=>{const o=[r[0],r[1]+" › "+r[2]+(r[3]?" › "+r[3]:""),r[4],r[5],r[6]+" / "+r[7],r[9],r[11]]; if(r[9]==="Errou") o._c="bad"; return o});
+  const apRows=aprov.map(r=>{const o=[r[0]==="Matéria"?r[1]:r[0]==="Tópico"?"   "+r[2]:"      "+r[3],r[4]===""?"":String(r[4]).replace(".",",")+" min",r[5],r[6],r[7]===""?"–":r[7]+"%"]; o._c=r[0]==="Matéria"?"lv1":r[0]==="Tópico"?"lv2":"lv3"; return o});
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Mahjuris: relatório de estudo</title><style>'+
+   'body{font:12px/1.4 system-ui,-apple-system,Roboto,Arial,sans-serif;color:#1b2326;margin:24px}h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 6px}p{margin:4px 0}.m{color:#5b676b}'+
+   'table{border-collapse:collapse;width:100%;margin-top:6px}th,td{border-bottom:1px solid #d5dcde;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef2f3;font-size:11px}'+
+   'tr.bad td:first-child{border-left:3px solid #b3261e}tr.lv1 td{font-weight:700;background:#f6f8f8}tr.lv2 td:first-child{padding-left:14px}tr.lv3 td:first-child{padding-left:28px;color:#5b676b}td{white-space:pre-wrap}'+
+   '.att td:nth-child(3),.att td:nth-child(4){min-width:120px}@page{margin:14mm}thead{display:table-header-group}tr{page-break-inside:avoid}</style></head><body>'+
+   '<h1>Mahjuris: relatório de estudo</h1><p class="m">Gerado em '+e(new Date().toLocaleString("pt-BR"))+'</p>'+
+   '<p>Tempo total: <b>'+e(durT(tot.ms))+'</b> · Acertos: <b>'+tot.ok+'</b> · Erros: <b>'+tot.err+'</b> · Aproveitamento: <b>'+e(pctT(tot)==null?"–":pctT(tot)+"%")+'</b></p>'+
+   '<h2>Pontos de atenção ('+att.length+')</h2><p class="m">Cartas que você já errou, das mais críticas para as menos críticas: primeiro as que você errou na última tentativa, depois as com mais erros. A borda vermelha marca as que ainda estão erradas.</p>'+
+   (att.length?tbl(["#","Matéria › tópico › artigo","Pergunta","Resposta","Erros / acertos","Última","Próxima revisão"],attRows,"att"):'<p>Nenhuma carta errada registrada ainda.</p>')+
+   '<h2>Aproveitamento por matéria, tópico e subtópico</h2>'+tbl(["Matéria / tópico / subtópico","Tempo","Acertos","Erros","Aproveitamento"],apRows)+
+   '</body></html>';
+}
+function exportReport(){
+  const html=reportHtml();
+  try{ if(window.MJAndroid&&window.MJAndroid.printHtml){ window.MJAndroid.printHtml(html,"Mahjuris - relatório "+stamp()); offerUndo("Escolha “Salvar como PDF” na tela de impressão.",null); return; } }catch(e){}
+  const w=window.open("","_blank"); if(!w){ offerUndo("Não consegui abrir o relatório.",null); return; }
+  w.document.open(); w.document.write(html); w.document.close(); setTimeout(()=>{ try{w.focus(); w.print()}catch(e){} },400);
+}
+function renderTempo(){
+  const box=$("tempo-box"); if(!box) return; box.innerHTML="";
+  const ent=Object.entries(STATS).filter(([k,s])=>s.ms>=1000||s.ok||s.err).sort((a,b)=>b[1].ms-a[1].ms);
+  const h=document.createElement("h3"); h.textContent="Estatísticas por matéria"; box.appendChild(h);
+  const hint=document.createElement("p"); hint.className="note"; hint.textContent="Toque numa matéria para ver os tópicos e subtópicos, do pior para o melhor aproveitamento."; box.appendChild(hint);
+  if(Object.values(STATS).some(s=>s.ok||s.err)){ const ex=document.createElement("div"); ex.className="st-acts st-export";
+    ex.append(button("Exportar planilha (Excel)","btn small primary",exportXlsx), button("Relatório em PDF","btn small",exportReport)); box.appendChild(ex); }
+  if(!ent.length){const p=document.createElement("p"); p.className="note"; p.textContent="Aqui aparecem o tempo de estudo e o aproveitamento de cada matéria. O cronômetro começa sozinho quando você inicia uma fase."; box.appendChild(p); return}
+  const lineOf=s=>(s.ms!=null?"Tempo "+durT(s.ms)+" · ":"")+s.ok+(s.ok===1?" acerto":" acertos")+" · "+s.err+(s.err===1?" erro":" erros")+(s.fases?" · "+s.fases+(s.fases===1?" fase concluída":" fases concluídas"):"");
+  const head=(name,s,tag)=>{const top=document.createElement(tag||"div"); top.className="st-top";
+    const n=document.createElement("strong"); n.textContent=name; const p=pctT(s);
+    const pc=document.createElement("span"); pc.className="st-pct"; pc.textContent=p==null?"–":p+"%"; pc.title="Aproveitamento";
+    top.append(n,pc); return top};
+  const sub=s=>{const d=document.createElement("div"); d.className="st-sub"; d.textContent=lineOf(s); return d};
+  const bar=s=>{const m=document.createElement("div"); m.className="meter"; const i=document.createElement("i"); i.style.width=(pctT(s)||0)+"%"; m.appendChild(i); return m};
+  const worst=(a,b)=>{const pa=pctT(a[1]), pb=pctT(b[1]); return (pa==null?101:pa)-(pb==null?101:pb)||b[1].err-a[1].err};
+  const ul=document.createElement("ul"); ul.className="statlist";
+  const tot={ms:0,ok:0,err:0,fases:0};
+  ent.forEach(([mat,s])=>{
+    tot.ms+=s.ms; tot.ok+=s.ok; tot.err+=s.err; tot.fases+=s.fases||0;
+    const li=document.createElement("li");
+    const det=document.createElement("details"); det.className="st-mat"; det.open=OPENMAT.has(mat); det.addEventListener("toggle",()=>{det.open?OPENMAT.add(mat):OPENMAT.delete(mat)});
+    const sm=document.createElement("summary"); sm.append(head(mat,s),sub(s),bar(s)); det.appendChild(sm);
+    const tops=allDecks().filter(d=>groupOf(d)===mat).map(d=>[d,DST.decks[d.id]]).filter(([d,x])=>x&&(x.ok||x.err||x.ms>=1000));
+    if(!tops.length){const n=document.createElement("p"); n.className="note"; n.textContent="Ainda sem dados por tópico nesta matéria."; det.appendChild(n)}
+    const tl=document.createElement("ul"); tl.className="statlist st-tops";
+    tops.map(([d,x])=>[d,x]).sort((a,b)=>worst([0,a[1]],[0,b[1]])).forEach(([d,x])=>{
+      const tli=document.createElement("li"); tli.append(head(d.name,x),sub(x),bar(x));
+      const wr=wrongPairs(d);
+      const row=document.createElement("div"); row.className="st-acts";
+      row.append(...armed("all:"+d.id,"Jogar o baralho inteiro","Confirmar: recomeçar do zero","btn small",()=>{ dropProg(d.id); selectDeck(d.id); startGame(); },renderTempo));
+      const eb=button(wr.length?"Jogar só as que errei ("+wr.length+")":"Nenhuma carta errada pendente","btn small primary",()=>playWrong(d));
+      eb.disabled=!wr.length; row.appendChild(eb);
+      { const sr=srsOf(d); if(sr.due.length) row.appendChild(button("Revisão de hoje ("+sr.due.length+")","btn small primary",()=>playReview(d))); else if(sr.later.length){ const n=document.createElement("span"); n.className="st-sub"; n.textContent="Próxima revisão "+whenT(sr.next); row.appendChild(n); } }
+      tli.appendChild(row);
+      // subtópicos (artigos), piores primeiro
+      const subs=new Map();
+      d.pairs.forEach(pp=>{const x2=DST.pairs[pp.id]; if(!x2||!(x2.ok||x2.err)) return; const k=pp.sub||"Outros"; const a2=subs.get(k)||{ok:0,err:0}; a2.ok+=x2.ok; a2.err+=x2.err; subs.set(k,a2)});
+      if(subs.size){
+        const sd=document.createElement("details"); sd.className="st-subs";
+        const ss=document.createElement("summary"); ss.textContent="Subtópicos ("+subs.size+")"; sd.appendChild(ss);
+        const sl=document.createElement("ul"); sl.className="st-sublist";
+        [...subs.entries()].sort(worst).forEach(([k,x3])=>{const r=document.createElement("li"); const n=document.createElement("span"); n.textContent=k; const v=document.createElement("b"); const p3=pctT(x3); v.textContent=(p3==null?"–":p3+"%")+" · "+x3.err+(x3.err===1?" erro":" erros"); r.append(n,v); if(x3.err&&p3!=null&&p3<70) r.className="bad"; sl.appendChild(r)});
+        sd.appendChild(sl); tli.appendChild(sd);
+      }
+      tl.appendChild(tli);
+    });
+    if(tops.length) det.appendChild(tl);
+    const mr=document.createElement("div"); mr.className="st-acts st-matreset";
+    mr.append(...armed("mat:"+mat,"Zerar esta matéria","Confirmar: zerar "+mat,"btn small danger",()=>resetMat(mat),renderTempo)); det.appendChild(mr);
+    li.appendChild(det); ul.appendChild(li);
+  });
+  if(ent.length>1){const li=document.createElement("li"); li.className="tot"; li.append(head("Todas as matérias",tot),sub(tot),bar(tot)); ul.appendChild(li)}
+  box.appendChild(ul);
+  const note=document.createElement("p"); note.className="note"; note.textContent="Aproveitamento = acertos ÷ (acertos + erros). Tudo fica salvo neste aparelho."; box.appendChild(note);
+  const zr=document.createElement("div"); zr.className="st-acts"; zr.append(...armed("tempo","Zerar todas as estatísticas","Confirmar: zerar todas as matérias","btn small",()=>{ const u=statSnap(); STATS={}; DST={decks:{},pairs:{}}; T.phase=0; tSave(); tRender(); renderTempo(); offerUndo("Estatísticas zeradas.",u); },renderTempo)); box.appendChild(zr);
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden){ T.wasRun=T.wasRun||T.run; tPause(); saveBoard(); } else if(T.wasRun){ T.wasRun=false; resumeIfIdle(); } });
+window.addEventListener("pagehide",()=>{ tTick(); saveBoard(); tSave(); });
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+
+/* ---------- jogo ---------- */
+let G=null; // estado da partida
+const norm=s=>String(s).trim().toLowerCase().replace(/\s+/g," ");
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function colsFor(){const w=$("board-scroll").clientWidth; return w<420?3:w<600?4:w<800?5:w<1000?6:7}
+
+function buildLayout(n,cols,stacked){
+  const pos=[];
+  let upper=stacked?Math.floor(n*0.5):0;
+  if(n<8) upper=0;
+  const base=n-upper;
+  if(upper) cols=Math.min(cols,Math.max(4,Math.ceil(Math.sqrt(base*1.8))));
+  const rows=Math.ceil(base/cols);
+  for(let r=0;r<rows;r++){
+    const inRow=Math.min(cols,base-r*cols), start=Math.floor((cols-inRow)/2);
+    for(let k=0;k<inRow;k++) pos.push({c:start+k,r,l:0});
+  }
+  let prev=pos.slice(), l=1, rest=upper;
+  const cx=(cols-1)/2, cy=(rows-1)/2;
+  while(rest>0&&prev.length>1){
+    const cand=prev.slice().sort((a,b)=>(Math.abs(a.c-cx)*0.8+Math.abs(a.r-cy))-(Math.abs(b.c-cx)*0.8+Math.abs(b.r-cy))||a.r-b.r||a.c-b.c);
+    const k=Math.min(rest,Math.max(1,Math.floor(prev.length*0.62)));
+    const layer=cand.slice(0,k).map(p=>({c:p.c,r:p.r,l}));
+    pos.push(...layer); rest-=k; prev=layer; l++;
+  }
+  if(rest>0){ // sobra: completa uma fileira extra embaixo
+    for(let k=0;k<rest;k++) pos.push({c:k%cols,r:rows+Math.floor(k/cols),l:0});
+  }
+  return pos;
+}
+const key=(c,r,l)=>c+","+r+","+l;
+function freeIn(p,set){
+  if(set.has(key(p.c,p.r,p.l+1))) return false;
+  return !set.has(key(p.c-1,p.r,p.l)) || !set.has(key(p.c+1,p.r,p.l));
+}
+// Distribui os pares nas posições simulando uma partida resolvida: garante solução.
+function deal(positions,pairs,fixed){
+  for(let attempt=0;attempt<60;attempt++){
+    const set=new Set(positions.map(p=>key(p.c,p.r,p.l)));
+    (fixed||[]).forEach(p=>set.add(key(p.c,p.r,p.l)));
+    const order=shuffle(pairs.slice()); const out=[]; let ok=true;
+    for(const pr of order){
+      const free=positions.filter(p=>set.has(key(p.c,p.r,p.l))&&freeIn(p,set)&&!(fixed||[]).some(f=>f.c===p.c&&f.r===p.r&&f.l===p.l));
+      if(free.length<2){ok=false;break}
+      shuffle(free); const [a,b]=free;
+      out.push({...a,pair:pr,side:"front"},{...b,pair:pr,side:"back"});
+      set.delete(key(a.c,a.r,a.l)); set.delete(key(b.c,b.r,b.l));
+    }
+    if(ok) return out;
+  }
+  return null;
+}
+
+/* Respostas extras (sem par): versos de outros pares do baralho, parecidos com os desta fase. */
+// Sem respostas avulsas: toda peça do tabuleiro tem par. A dificuldade vem de juntar pares parecidos na mesma rodada.
+function decoyCount(){ return 0; }
+const WC=new Map(); function wordsOf(p){ let w=WC.get(p); if(!w){ w=words(p.front+" "+p.back); WC.set(p,w); } return w; }
+function simScore(a,b){
+  let s=a.type===b.type?2:0;
+  if(/\d/.test(a.back)&&/\d/.test(b.back)) s+=2;
+  const wb=wordsOf(b); let sh=0; wordsOf(a).forEach(w=>{ if(wb.has(w)) sh++; }); return s+Math.min(4,sh);
+}
+function pickSimilar(cands,seed,k){
+  const pool=cands.slice(), out=[];
+  if(!seed.length&&pool.length&&k>0) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  while(out.length<k&&pool.length){
+    const ref=[...seed,...out]; let best=-1, bi=0;
+    pool.forEach((c,i)=>{ let sc=0; ref.forEach(r=>sc+=simScore(c,r)); sc=sc/ref.length+Math.random()*1.2; if(sc>best){best=sc; bi=i;} });
+    out.push(pool.splice(bi,1)[0]);
+  }
+  return out;
+}
+const words=s=>new Set(norm(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").split(/[^a-z0-9]+/).filter(w=>w.length>3));
+function pickDecoys(deck,pairs,k){
+  if(k<=0) return [];
+  const inPhase=new Set(pairs.map(p=>p.id)), backs=new Set(pairs.map(p=>norm(p.back))), fronts=new Set(pairs.map(p=>norm(p.front)));
+  const types=new Set(pairs.map(p=>p.type));
+  const pool=deck.pairs.filter(p=>!inPhase.has(p.id)&&!backs.has(norm(p.back))&&!fronts.has(norm(p.front)));
+  const targets=pairs.map(p=>({type:p.type,num:/\d/.test(p.back),len:p.back.length,w:words(p.back)}));
+  const scored=pool.map(c=>{
+    const cw=words(c.back), num=/\d/.test(c.back);
+    let best=0;
+    for(const t of targets){
+      let sc=(t.type===c.type?3:0)+(t.num===num?1.5:0)+Math.max(0,1.5-Math.abs(Math.log((c.back.length+5)/(t.len+5))));
+      let shared=0; cw.forEach(w=>{if(t.w.has(w)) shared++}); sc+=Math.min(3,shared);
+      if(sc>best) best=sc;
+    }
+    if(!types.has(c.type)) best-=4;
+    return {c,sc:best+Math.random()*1.5};
+  }).sort((a,b)=>b.sc-a.sc);
+  const seen=new Set(), out=[];
+  for(const {c} of scored){ const n=norm(c.back); if(seen.has(n)) continue; seen.add(n); out.push(c); if(out.length>=k) break; }
+  return out;
+}
+function dealWithDecoys(pairs,decoys,cols,stacked){
+  for(let k=decoys.length;k>=0;k--){
+    const ds=decoys.slice(0,k);
+    const positions=buildLayout(pairs.length*2+k,cols,stacked);
+    const keys=new Set(positions.map(p=>key(p.c,p.r,p.l)));
+    const open=positions.filter(p=>p.l===0&&!keys.has(key(p.c,p.r,1)));
+    for(let tries=0;tries<25;tries++){
+      if(open.length<k) break;
+      const spots=shuffle(open.slice()).slice(0,k);
+      const rest=positions.filter(p=>!spots.includes(p));
+      const tiles=deal(rest,pairs,spots);
+      if(tiles) return tiles.concat(spots.map((p,i)=>({...p,pair:ds[i],side:"back",decoy:true})));
+    }
+  }
+  return deal(buildLayout(pairs.length*2,cols,false),pairs);
+}
+function newGame(){
+  const deck=deckById($("sel-deck").value);
+  if(window.MJPlan&&!MJPlan.allowPlay(deck)){ toMenu(); return; }
+  renderPhase();
+  if(!deck.pairs.length){ G=null; tPause(); showReader("Baralho vazio","Adicione pares na aba Baralhos antes de jogar.","bad"); $("board").innerHTML=""; return; }
+  if(deckStatus(deck).done){ G=null; tPause(); $("board").innerHTML=""; showReader("Baralho estudado","Você dominou todos os pares deste baralho. Para estudar de novo, use Recomeçar do zero.","ok"); deckDone(deck); return; }
+  const size=+$("sel-size").value;
+  const pairs=phasePairs(deck,size);
+  const stacked=$("sel-stack").value==="1";
+  const cols=colsFor();
+  const phaseN=prog(deck.id).phase;
+  const decoys=pickDecoys(deck,pairs,decoyCount(pairs.length,phaseN,deck.pairs.length-pairs.length));
+  let tiles=dealWithDecoys(pairs,decoys,cols,stacked);
+  tiles.sort((a,b)=>a.l-b.l||a.r-b.r||a.c-b.c).forEach((t,i)=>{t.id="t"+i; t.alive=true});
+  const mode=$("sel-mode").value;
+  G={deckId:deck.id,phase:prog(deck.id).phase,pairs,tiles,cols,sel:null,ok:0,err:0,missed:new Map(),mode,lives:3,over:false,hintTimer:null,sess:emptySess()};
+  edTarget=null; $("btn-edit").hidden=true;
+  tNewPhase(deck);
+  $("st-lives-wrap").hidden=mode!=="avancado";
+  hideOverlay();
+  showReader("Como jogar","Toque numa peça livre e depois na peça que responde a ela. Uma peça está livre quando nada está em cima dela e um dos lados (esquerdo ou direito) está vazio. Peças presas ficam mais escuras.");
+  renderBoard(); updateStats();
+}
+
+function aliveSet(){return new Set(G.tiles.filter(t=>t.alive).map(t=>key(t.c,t.r,t.l)))}
+function isFree(t){return freeIn(t,aliveSet())}
+function covered(t,set){return set.has(key(t.c,t.r,t.l+1))}
+function matches(a,b){
+  if(a.side===b.side) return false;
+  const f=a.side==="front"?a:b, k=a.side==="front"?b:a;
+  return f.pair.id===k.pair.id || norm(f.pair.back)===norm(k.pair.back) || norm(f.pair.front)===norm(k.pair.front);
+}
+let edTarget=null;
+function deckOfPair(pr){return allDecks().find(d=>d.pairs.includes(pr))}
+function editCard(){
+  const pr=edTarget; if(!pr) return; const deck=deckOfPair(pr); if(!deck) return;
+  const wasRun=T.run; tPause();
+  openCardEditor(pr,deck,{saved:()=>afterEdit(pr),closed:()=>{ if(wasRun) resumeIfIdle(); }});
+}
+function applyPairEdit(deck,pr,nf,nb){
+  const old={front:pr.front,back:pr.back,had:EDITS[pr.id]?{...EDITS[pr.id]}:null};
+  const fixed=deck.builtin&&!pr.extra;
+  if(fixed){ if(pr._of==null){pr._of=pr.front; pr._ob=pr.back;} if(nf===pr._of&&nb===pr._ob) delete EDITS[pr.id]; else EDITS[pr.id]={front:nf,back:nb}; saveEdits(); }
+  pr.front=nf; pr.back=nb; if(!deck.builtin) persist(deck); else if(pr.extra) saveExtra();
+  return ()=>{ if(fixed){ if(old.had) EDITS[pr.id]=old.had; else delete EDITS[pr.id]; saveEdits(); }
+    pr.front=old.front; pr.back=old.back; if(!deck.builtin) persist(deck); else if(pr.extra) saveExtra(); };
+}
+function openCardEditor(pr,deck,cb){
+  cb=cb||{};
+  const lab=TYPES[pr.type]||["Pergunta","Resposta"];
+  const d=$("dialog"); d.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Editar carta";
+  const f=document.createElement("form"); f.className="editform";
+  f.innerHTML='<div class="field"><label for="ed-front"></label><textarea id="ed-front" required></textarea></div><div class="field"><label for="ed-back"></label><textarea id="ed-back" required></textarea></div><p class="note" id="ed-note" style="margin:0"></p><div class="row"></div>';
+  f.querySelector('label[for="ed-front"]').textContent=lab[0]; f.querySelector('label[for="ed-back"]').textContent=lab[1];
+  f.querySelector("#ed-front").value=pr.front; f.querySelector("#ed-back").value=pr.back;
+  const note=f.querySelector("#ed-note");
+  note.textContent=deck.builtin&&!pr.extra?"A alteração fica gravada neste aparelho e continua valendo quando o app for atualizado.":"A alteração fica gravada no baralho \u201c"+deck.name+"\u201d.";
+  const row=f.querySelector(".row");
+  const close=()=>{ hideOverlay(); if(cb.closed) cb.closed(); };
+  const done=undo=>{ close(); if(cb.saved) cb.saved(pr); else afterDeckChange(); offerUndo("Carta alterada.",undo); };
+  const sb=document.createElement("button"); sb.type="submit"; sb.className="btn primary"; sb.textContent="Salvar alteração"; row.appendChild(sb);
+  if(deck.builtin&&!pr.extra&&EDITS[pr.id]) row.appendChild(button("Restaurar original","btn",()=>done(applyPairEdit(deck,pr,pr._of,pr._ob))));
+  const cbt=document.createElement("button"); cbt.type="button"; cbt.className="btn"; cbt.textContent="Cancelar"; cbt.addEventListener("click",close); row.appendChild(cbt);
+  const cf=document.createElement("div"); cf.className="editform"; cf.hidden=true;
+  f.addEventListener("submit",e=>{ e.preventDefault();
+    const nf=f.querySelector("#ed-front").value.trim(), nb=f.querySelector("#ed-back").value.trim();
+    if(!nf||!nb){ note.textContent="Preencha os dois lados antes de salvar."; return; }
+    if(nf===pr.front&&nb===pr.back){ close(); return; }
+    cf.innerHTML=""; const q=document.createElement("p"); q.className="note"; q.style.margin="0"; q.textContent="Confira a alteração antes de salvar:"; cf.appendChild(q);
+    [[lab[0],pr.front,nf],[lab[1],pr.back,nb]].forEach(([l,a,b])=>{ if(a===b) return;
+      const box=document.createElement("div"); box.className="cmp";
+      const t=document.createElement("span"); t.className="t"; t.textContent=l;
+      const o=document.createElement("del"); o.textContent=a; const n=document.createElement("ins"); n.textContent=b;
+      box.append(t,o,n); cf.appendChild(box); });
+    const r2=document.createElement("div"); r2.className="row";
+    r2.append(button("Confirmar e salvar","btn primary",()=>done(applyPairEdit(deck,pr,nf,nb))), button("Voltar e editar","btn",()=>{cf.hidden=true; f.hidden=false; f.querySelector("#ed-front").focus()}));
+    cf.appendChild(r2); f.hidden=true; cf.hidden=false; });
+  d.append(h,f,cf); $("overlay").hidden=false; f.querySelector("#ed-front").focus();
+}
+/* ---------- ações nas cartas: duplicar, copiar, excluir (com desfazer) ---------- */
+let undoT=null;
+function hideUndo(){const u=$("undo-bar"); if(u) u.hidden=true; clearTimeout(undoT)}
+function offerUndo(msg,fn){
+  let u=$("undo-bar"); if(!u){u=document.createElement("div"); u.id="undo-bar"; u.className="undo"; u.setAttribute("role","status"); document.body.appendChild(u)}
+  u.innerHTML=""; const s=document.createElement("span"); s.textContent=msg; u.appendChild(s);
+  if(fn) u.appendChild(button("Desfazer","btn small",()=>{ fn(); hideUndo(); afterDeckChange(); }));
+  u.hidden=false; clearTimeout(undoT); undoT=setTimeout(hideUndo,fn?10000:3000);
+}
+function afterDeckChange(){ if(G){ renderBoard(); saveBoard(); } renderDeckSelect(); renderDecksIfOpen(); }
+function savePairs(d){ if(!d.builtin) persist(d); else saveExtra(); }
+function removePair(d,p){ d.pairs=d.pairs.filter(x=>x!==p); if(p.extra&&EXTRA[d.id]){ EXTRA[d.id]=EXTRA[d.id].filter(x=>x!==p); if(!EXTRA[d.id].length) delete EXTRA[d.id]; } savePairs(d); }
+function dupPair(d,p){
+  const np={id:uid(),type:p.type,front:p.front,back:p.back}; if(p.sub) np.sub=p.sub;
+  d.pairs.splice(d.pairs.indexOf(p)+1,0,np);
+  if(d.builtin){ np.extra=true; np.after=p.id; (EXTRA[d.id]||(EXTRA[d.id]=[])).push(np); }
+  savePairs(d); afterDeckChange(); offerUndo("Carta duplicada. A cópia está logo acima da original.",()=>removePair(d,np));
+}
+function delPair(d,p){
+  const i=d.pairs.indexOf(p); removePair(d,p); confirmDel=null; afterDeckChange();
+  offerUndo("Carta excluída.",()=>{ d.pairs.splice(i,0,p); if(p.extra) (EXTRA[d.id]||(EXTRA[d.id]=[])).push(p); savePairs(d); });
+}
+function legacyCopy(t){ const a=document.createElement("textarea"); a.value=t; a.setAttribute("readonly",""); a.style.cssText="position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(a); a.select(); let ok=false; try{ok=document.execCommand("copy")}catch(e){} a.remove(); return ok; }
+function copyText(t){
+  try{ if(window.MJAndroid&&window.MJAndroid.copyText){ window.MJAndroid.copyText(t); return Promise.resolve(true); } }catch(e){}
+  if(navigator.clipboard&&window.isSecureContext) return navigator.clipboard.writeText(t).then(()=>true,()=>legacyCopy(t));
+  return Promise.resolve(legacyCopy(t));
+}
+function copyPair(p){ const lab=TYPES[p.type]||["Frente","Verso"];
+  copyText(lab[0]+": "+p.front+"\n"+lab[1]+": "+p.back).then(ok=>offerUndo(ok?"Texto da carta copiado.":"Não consegui copiar. Toque e segure o texto para copiar.",null)); }
+function armed(key,label,confirmLabel,cls,fn,rerender){
+  if(confirmDel!==key) return [button(label,cls,()=>{confirmDel=key; rerender()})];
+  return [button(confirmLabel,cls,()=>{confirmDel=null; fn()}), button("Cancelar","btn small",()=>{confirmDel=null; rerender()})];
+}
+function afterEdit(pr){ if(G){ renderBoard(); saveBoard(); } showReader("Carta corrigida",pr.front+"  \u2192  "+pr.back,"ok"); renderDecksIfOpen(); }
+function labelOf(t){return TYPES[t.pair.type]?TYPES[t.pair.type][t.side==="front"?0:1]:(t.side==="front"?"Frente":"Verso")}
+function textOf(t){return t.side==="front"?t.pair.front:t.pair.back}
+
+let TW=120,TH=100;
+const OX=9,OY=10;
+function renderBoard(){
+  const board=$("board"); board.innerHTML="";
+  if(!G) return;
+  const avail=$("board-scroll").clientWidth-20;
+  const maxL=Math.max(0,...G.tiles.map(t=>t.l));
+  const maxC=Math.max(...G.tiles.map(t=>t.c))+1, maxR=Math.max(...G.tiles.map(t=>t.r))+1;
+  TW=Math.max(74,Math.min(158,Math.floor((avail-maxL*OX-8)/maxC)));
+  TH=Math.round(TW*0.84);
+  const padX=maxL*OX, padY=maxL*OY;
+  board.style.width=(maxC*TW+padX+8)+"px"; board.style.height=(maxR*TH+padY+10)+"px";
+  const set=aliveSet();
+  for(const t of G.tiles){
+    if(!t.alive) continue;
+    const b=document.createElement("button");
+    b.className="tile "+t.side+(t.l>0?" up":""); b.dataset.id=t.id;
+    b.style.left=(padX+t.c*TW-t.l*OX)+"px"; b.style.top=(padY+t.r*TH-t.l*OY)+"px";
+    b.style.width=TW+"px"; b.style.height=TH+"px"; b.style.zIndex=t.l*1000+t.r*10+t.c;
+    const isCov=covered(t,set);
+    if(isCov){b.tabIndex=-1; b.setAttribute("aria-hidden","true")}
+    if(!freeIn(t,set)) b.classList.add("blocked");
+    if(G.sel===t.id) b.classList.add("sel");
+    const face=document.createElement("span"); face.className="face";
+    const kind=document.createElement("span"); kind.className="kind";
+    kind.appendChild(document.createElement("i")); kind.appendChild(document.createTextNode(labelOf(t)));
+    const txt=document.createElement("span"); txt.className="txt";
+    const s=textOf(t); txt.textContent=s;
+    const fs=TW/120*(s.length<22?15:s.length<45?13:s.length<80?11.5:10.5);
+    txt.style.fontSize=Math.max(9.5,fs)+"px";
+    const lines=Math.max(2,Math.floor((TH-30)/(Math.max(9.5,fs)*1.18)));
+    txt.style.webkitLineClamp=lines;
+    face.append(kind,txt); b.appendChild(face);
+    b.setAttribute("aria-label",labelOf(t)+": "+s+(freeIn(t,set)?"":" (presa)"));
+    b.addEventListener("click",()=>onTile(t.id));
+    board.appendChild(b);
+  }
+}
+function el(id){return document.querySelector('.tile[data-id="'+id+'"]')}
+function tile(id){return G.tiles.find(t=>t.id===id)}
+function flash(id,cls,ms){const e=el(id); if(!e) return; e.classList.remove(cls); void e.offsetWidth; e.classList.add(cls); setTimeout(()=>e.classList.remove(cls),ms)}
+function clearHints(){clearTimeout(G.hintTimer); document.querySelectorAll(".tile.cand").forEach(e=>e.classList.remove("cand"))}
+
+function onTile(id){
+  if(!G||G.over||T.user) return;
+  const t=tile(id); if(!t||!t.alive) return;
+  edTarget=t.pair; $("btn-edit").hidden=false;
+  if(!isFree(t)){
+    flash(id,"stuck",320);
+    showReader(labelOf(t)+" · presa",textOf(t)+"  Para usar esta peça, libere um dos lados.");
+    return;
+  }
+  if(G.sel===id){ G.sel=null; el(id)?.classList.remove("sel"); clearHints(); showReader("Seleção desfeita","Escolha outra peça."); return; }
+  const prev=G.sel?tile(G.sel):null;
+  if(!prev||prev.side===t.side){
+    if(prev) el(prev.id)?.classList.remove("sel");
+    G.sel=id; el(id)?.classList.add("sel");
+    showReader(labelOf(t),textOf(t));
+    if(G.mode==="iniciante") showHints(t);
+    return;
+  }
+  clearHints();
+  const front=prev.side==="front"?prev:t;
+  if(matches(prev,t)){
+    G.ok++; statHit(true,front.pair); prev.alive=false; t.alive=false; G.sel=null;
+    showReader("Par certo",front.pair.front+"  →  "+(front===prev?t:prev).pair.back,"ok");
+    [prev.id,t.id].forEach(x=>{const e=el(x); if(e){e.classList.remove("sel"); e.classList.add("gone")}});
+    setTimeout(()=>{renderBoard(); updateStats(); checkEnd()},360);
+  }else{
+    G.err++; statHit(false,(prev.decoy?t:prev).pair);
+    const blame=prev.decoy?t:prev; G.missed.set(blame.pair.id,blame.pair);
+    flash(prev.id,"wrong",450); flash(t.id,"wrong",450);
+    el(prev.id)?.classList.remove("sel"); G.sel=null;
+    showReader("Não combina",'"'+front.pair.front+'" não se responde com "'+(front===prev?t:prev).pair.back+'". '+(prev.decoy||t.decoy?"Essa resposta não tem par neste tabuleiro. ":"")+"A pergunta volta na próxima fase.","bad");
+    if(G.mode==="avancado"){ G.lives--; if(G.lives<=0){ G.over=true; tPause(); commitSess(); updateStats(); setTimeout(gameOver,500); return; } }
+    updateStats();
+  }
+}
+function showHints(t){
+  const set=aliveSet();
+  const visible=G.tiles.filter(x=>x.alive&&x.side!==t.side&&!covered(x,set));
+  const right=visible.filter(x=>matches(t,x));
+  if(!right.length){ showReader(labelOf(t),textOf(t)+"  (O par desta peça ainda está coberto. Tente outra.)"); return; }
+  const decoys=shuffle(visible.filter(x=>!matches(t,x))).slice(0,2);
+  const c=[right[0],...decoys];
+  c.forEach(x=>el(x.id)?.classList.add("cand"));
+  G.hintTimer=setTimeout(clearHints,4000);
+}
+function freePairs(){
+  const set=aliveSet(); const free=G.tiles.filter(t=>t.alive&&freeIn(t,set));
+  let n=0; const used=new Set();
+  for(const a of free) if(a.side==="front") for(const b of free) if(!used.has(b.id)&&matches(a,b)){n++;used.add(b.id);break}
+  return n;
+}
+function updateStats(){
+  const left=G.tiles.filter(t=>t.alive&&!t.decoy).length/2;
+  $("g-phase").textContent="Fase "+G.phase; $("st-left").textContent=left; $("st-ok").textContent=G.ok; $("st-err").textContent=G.err; $("st-lives").textContent=G.lives;
+  const dec=G.tiles.filter(t=>t.alive&&t.decoy).length; $("st-dec").textContent=dec; $("st-dec-wrap").hidden=!dec;
+  const fp=left?freePairs():0;
+  $("stuck").hidden=!(left>0&&fp===0&&!G.over);
+}
+function reshuffle(){
+  const alive=G.tiles.filter(t=>t.alive&&!t.decoy), dec=G.tiles.filter(t=>t.alive&&t.decoy);
+  const prs=[...new Map(alive.filter(t=>t.side==="front").map(t=>[t.pair.id,t.pair])).values()];
+  let positions=alive.map(t=>({c:t.c,r:t.r,l:t.l}));
+  let dealt=deal(positions,prs,dec.map(t=>({c:t.c,r:t.r,l:t.l})));
+  if(dealt) dealt=dealt.concat(dec.map(t=>({c:t.c,r:t.r,l:t.l,pair:t.pair,side:"back",decoy:true})));
+  else dealt=dealWithDecoys(prs,dec.map(t=>t.pair),G.cols,$("sel-stack").value==="1");
+  dealt.sort((a,b)=>a.l-b.l||a.r-b.r||a.c-b.c).forEach((t,i)=>{t.id="r"+Date.now()+i; t.alive=true});
+  G.tiles=dealt; G.sel=null; renderBoard(); updateStats();
+  showReader("Peças embaralhadas","O tabuleiro foi redistribuído e tem solução de novo.");
+}
+function checkEnd(){
+  if(G.tiles.some(t=>t.alive&&!t.decoy)) return;
+  G.over=true; tPause(); commitSess(); stat(materiaDe(deckById(G.deckId))).fases++; dstat(statIdOf(deckById(G.deckId))).fases++; tSave();
+  G.tiles.forEach(t=>{if(t.alive&&t.decoy){t.alive=false; el(t.id)?.classList.add("gone")}});
+  const deck=deckById(G.deckId), P=prog(deck.id);
+  const m=new Set(P.mastered), rv=new Set(P.review);
+  G.pairs.forEach(p=>{ if(G.missed.has(p.id)){rv.add(p.id); m.delete(p.id)} else {m.add(p.id); rv.delete(p.id)} });
+  P.mastered=[...m]; P.review=[...rv]; P.current=null; P.board=null; const done=G.phase; P.phase=done+1; saveProg(deck.id);
+  renderPhase(); renderDecksIfOpen();
+  const st=deckStatus(deck);
+  if(st.done){ deckDone(deck,done); return; }
+  const missed=[...G.missed.values()];
+  const d=$("dialog"); d.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Fase "+done+" concluída";
+  const p=document.createElement("p"); p.style.margin="0";
+  p.textContent=(G.pairs.length-missed.length)+" de "+G.pairs.length+" pares sem erro."+(missed.length===1?" O par que você errou volta na fase "+(done+1)+".":missed.length?" Os "+missed.length+" pares que você errou voltam na fase "+(done+1)+".":" Nenhum erro nesta fase.");
+  d.append(h,p,meterEl(st));
+  if(missed.length){
+    const s2=document.createElement("strong"); s2.textContent="Voltam na próxima fase"; d.appendChild(s2);
+    const ul=document.createElement("ul");
+    missed.forEach(x=>{const li=document.createElement("li"); li.textContent=x.front+" → "+x.back; ul.appendChild(li)});
+    d.appendChild(ul);
+  }
+  const row=document.createElement("div"); row.className="row";
+  row.appendChild(button("Jogar a fase "+(done+1),"btn primary",()=>newGame()));
+  row.appendChild(button("Voltar ao menu","btn",()=>toMenu()));
+  d.appendChild(row); showLocked();
+}
+function meterEl(st){
+  const w=document.createElement("div"); w.style.cssText="display:flex;flex-direction:column;gap:4px";
+  const t=document.createElement("span"); t.className="phase-meta"; t.textContent=st.mastered+" de "+st.total+" pares dominados"+(st.review?" · "+st.review+" para revisar":"");
+  const m=document.createElement("div"); m.className="meter"; const i=document.createElement("i"); i.style.width=(st.total?Math.round(st.mastered/st.total*100):0)+"%"; m.appendChild(i);
+  w.append(t,m); return w;
+}
+function deckDone(deck,lastPhase){
+  const d=$("dialog"); d.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Baralho estudado!";
+  const p=document.createElement("p"); p.style.margin="0";
+  p.textContent=(deck.pairs.length===1?"Você dominou o par de \u201c":"Você dominou todos os "+deck.pairs.length+" pares de \u201c")+deck.name+"\u201d"+(lastPhase?", em "+lastPhase+(lastPhase===1?" fase.":" fases."):".");
+  d.append(h,p,meterEl(deckStatus(deck)));
+  const row=document.createElement("div"); row.className="row";
+  const base=deck.temp?deckById(deck.statId):deck, sr=srsOf(base);
+  const rp=document.createElement("p"); rp.className="note"; rp.style.margin="0";
+  rp.textContent=sr.due.length?sr.due.length+(sr.due.length===1?" carta que você errou está disponível":" cartas que você errou estão disponíveis")+" para revisão agora."
+    :sr.later.length?sr.later.length+(sr.later.length===1?" carta que você errou fica agendada":" cartas que você errou ficam agendadas")+" para revisão. A próxima fica disponível "+whenT(sr.next)+". Os intervalos crescem a cada acerto: 1, 3, 7, 15 e 30 dias."
+    :"Nenhuma carta pendente de revisão neste baralho.";
+  d.appendChild(rp);
+  if(sr.due.length) row.appendChild(button("Revisar só as que errei ("+sr.due.length+")","btn primary",()=>{hideOverlay(); playReview(base)}));
+  row.appendChild(button("Refazer o baralho inteiro",sr.due.length?"btn":"btn primary",()=>{hideOverlay(); playWhole(base)}));
+  row.appendChild(button("Voltar ao menu","btn",()=>toMenu()));
+  d.appendChild(row); showLocked();
+}
+function gameOver(){
+  const deck=deckById(G.deckId), P=prog(deck.id);
+  const rv=new Set(P.review); G.missed.forEach((_,id)=>rv.add(id)); P.review=[...rv]; P.board=null; P.current=null; saveProg(deck.id); renderPhase();
+  const d=$("dialog"); d.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Fim de jogo na fase "+G.phase;
+  const p=document.createElement("p"); p.style.margin="0"; p.textContent="Você errou 3 vezes no modo avançado. Revise os pares abaixo e jogue a fase de novo.";
+  d.append(h,p);
+  const ul=document.createElement("ul");
+  [...G.missed.values()].forEach(m=>{const li=document.createElement("li"); li.textContent=m.front+" → "+m.back; ul.appendChild(li)});
+  d.appendChild(ul);
+  const row=document.createElement("div"); row.className="row";
+  row.appendChild(button("Jogar a fase "+G.phase+" de novo","btn primary",()=>newGame()));
+  row.appendChild(button("Voltar ao menu","btn",()=>toMenu()));
+  d.appendChild(row); showLocked();
+}
+function renderDecksIfOpen(){ if(!$("view-decks").hidden) renderDecks(); }
+function hideOverlay(){$("overlay").hidden=true; delete $("overlay").dataset.lock}
+function showLocked(){const o=$("overlay"); o.dataset.lock="1"; o.hidden=false}
+const isLocked=()=>!$("overlay").hidden&&$("overlay").dataset.lock==="1";
+function button(label,cls,fn){const b=document.createElement("button"); b.className=cls; b.textContent=label; b.addEventListener("click",fn); return b}
+function showReader(k,t,state){const r=$("reader"); r.className="reader"+(state?" "+state:""); $("r-kind").textContent=k; $("r-text").textContent=t}
+
+/* ---------- baralhos ---------- */
+let current=FIRST.id, confirmDel=null;
+function groupOf(d){return d.group||(d.builtin?"Exemplos":"Seus baralhos")}
+function fillDecks(g){const s=$("sel-deck"); s.innerHTML=""; [...TEMPD.values(),...allDecks()].filter(d=>groupOf(d)===g).forEach(d=>{const o=document.createElement("option"); o.value=d.id; o.textContent=d.name+" ("+d.pairs.length+")"+(window.MJPlan&&!MJPlan.deckOk(d)?" · Premium":""); s.appendChild(o)})}
+function selectDeck(id){const d=deckById(id); $("sel-mat").value=groupOf(d); fillDecks(groupOf(d)); $("sel-deck").value=d.id; renderMenu();}
+function renderDeckSelect(){
+  const cur=$("sel-deck").value||FIRST.id, m=$("sel-mat"); m.innerHTML="";
+  [...new Set(allDecks().map(groupOf))].forEach(g=>{const o=document.createElement("option"); o.value=g; o.textContent=g; m.appendChild(o)});
+  selectDeck(allDecks().some(d=>d.id===cur)?cur:FIRST.id);
+}
+function renderDecks(){
+  const ul=$("decklist"); ul.innerHTML="";
+  allDecks().forEach(d=>{
+    const li=document.createElement("li"); const b=document.createElement("button");
+    b.setAttribute("aria-current",d.id===current?"true":"false");
+    const n=document.createElement("span"); n.textContent=d.name;
+    const ds=deckStatus(d); const c=document.createElement("small"); const rvn=srsOf(d).due.length; c.textContent=d.pairs.length+" pares · "+(ds.done?"estudado":"fase "+ds.phase)+(rvn?" · "+rvn+" para revisar":"");
+    b.append(n,c); b.addEventListener("click",()=>{current=d.id; confirmDel=null; renderDecks()});
+    li.appendChild(b); ul.appendChild(li);
+  });
+  renderDetail();
+}
+function renderDetail(){
+  const box=$("deck-detail"); box.innerHTML="";
+  const d=deckById(current);
+  const head=document.createElement("div"); head.style.cssText="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center";
+  const h=document.createElement("h2"); h.textContent=d.name; head.appendChild(h);
+  const acts=document.createElement("div"); acts.className="row"; acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
+  acts.appendChild(button("Jogar este baralho","btn small primary",()=>{selectDeck(d.id); startGame()}));
+  { const rv=srsOf(d).due.length; if(rv) acts.appendChild(button("Revisar só as que errei ("+rv+")","btn small primary",()=>playReview(d))); }
+  const dst=deckStatus(d);
+  if(dst.mastered||dst.review||dst.phase>1) acts.append(...armed("prog","Zerar progresso","Confirmar: zerar progresso","btn small",()=>{ dropProg(d.id); renderDecks(); renderMenu(); },renderDetail));
+  acts.appendChild(button("Duplicar baralho","btn small",()=>{const nd={id:uid(),name:d.name+" (cópia)",pairs:d.pairs.map(p=>{const q={id:uid(),type:p.type,front:p.front,back:p.back}; if(p.sub) q.sub=p.sub; return q})}; if(d.group) nd.group=d.group; decks.push(nd); persist(nd); current=nd.id; renderDeckSelect(); renderDecks(); offerUndo("Baralho duplicado: "+nd.name+".",()=>{decks=decks.filter(x=>x!==nd); lsWrite(); deleteRemote(nd); current=d.id})}));
+  if(!d.builtin){
+    acts.append(...armed("deck","Excluir baralho","Confirmar exclusão","btn small danger",()=>{
+      const i=decks.indexOf(d); decks=decks.filter(x=>x.id!==d.id); lsWrite(); deleteRemote(d); dropProg(d.id); current=FIRST.id; renderDeckSelect(); renderDecks();
+      offerUndo("Baralho \u201c"+d.name+"\u201d excluído.",()=>{ decks.splice(i,0,d); persist(d); current=d.id; });
+    },renderDetail));
+  }
+  head.appendChild(acts); box.appendChild(head);
+  if(d.pairs.length){const pn=document.createElement("p"); pn.className="note"; pn.textContent=dst.done?"Baralho estudado: todos os pares dominados.":"Fase "+dst.phase+" · "+dst.mastered+" de "+dst.total+" pares dominados"+(dst.review?" · "+dst.review+" para revisar":""); box.appendChild(pn)}
+  if(d.builtin){const p=document.createElement("p"); p.className="note"; p.textContent=(d.id===SAMPLE.id?"Baralho de exemplo com questões de Direito.":"Baralho que vem com o app ("+(d.group||"Mahjuris")+").")+" Você pode editar, duplicar e copiar as cartas abaixo; as alterações ficam gravadas neste aparelho."; box.appendChild(p)}
+  else{
+    const form=document.createElement("form"); form.style.cssText="display:flex;flex-direction:column;gap:10px";
+    form.innerHTML='<div class="field"><label for="f-type">Tipo de par</label><select id="f-type"></select></div><div class="addgrid"><div class="field"><label for="f-front" id="l-front">Pergunta</label><textarea id="f-front" required></textarea></div><div class="field"><label for="f-back" id="l-back">Resposta</label><textarea id="f-back" required></textarea></div></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="submit">Adicionar par</button><p class="msg" id="f-msg"></p></div>';
+    box.appendChild(form);
+    const ft=form.querySelector("#f-type");
+    Object.entries(TYPES).forEach(([k,v])=>{const o=document.createElement("option"); o.value=k; o.textContent=v[0]+" → "+v[1]; ft.appendChild(o)});
+    ft.addEventListener("change",()=>{form.querySelector("#l-front").textContent=TYPES[ft.value][0]; form.querySelector("#l-back").textContent=TYPES[ft.value][1]});
+    form.addEventListener("submit",e=>{e.preventDefault();
+      const f=form.querySelector("#f-front").value.trim(), b=form.querySelector("#f-back").value.trim();
+      if(!f||!b){form.querySelector("#f-msg").textContent="Preencha os dois lados.";return}
+      d.pairs.push({id:uid(),type:ft.value,front:f,back:b}); persist(d);
+      const keepType=ft.value; renderDeckSelect(); renderDecks();
+      const nft=$("f-type"); nft.value=keepType; nft.dispatchEvent(new Event("change")); $("f-msg").textContent="Par adicionado."; $("f-front").focus();
+    });
+    const bulk=document.createElement("details");
+    bulk.innerHTML='<summary style="cursor:pointer;font-weight:600">Colar vários pares de uma vez</summary><p class="note" style="margin:8px 0">Um par por linha, com frente e verso separados por | (barra vertical). Ex.: Prazo do inquérito com réu preso? | 10 dias</p><textarea id="bulk-text" rows="5"></textarea><div style="margin-top:8px"><button class="btn small" type="button" id="bulk-add">Adicionar linhas</button></div>';
+    box.appendChild(bulk);
+    bulk.querySelector("#bulk-add").addEventListener("click",()=>{
+      const lines=bulk.querySelector("#bulk-text").value.split(/\n/).map(l=>l.split("|")).filter(p=>p.length>=2&&p[0].trim()&&p.slice(1).join("|").trim());
+      lines.forEach(p=>d.pairs.push({id:uid(),type:ft.value,front:p[0].trim(),back:p.slice(1).join("|").trim()}));
+      if(lines.length){persist(d); renderDeckSelect(); renderDecks(); $("f-msg").textContent=lines.length+" pares adicionados."}
+    });
+  }
+  const ul=document.createElement("ul"); ul.className="pairs";
+  if(!d.pairs.length){const p=document.createElement("p"); p.className="note"; p.textContent="Nenhum par ainda. Escreva a frente e o verso acima e toque em Adicionar par."; box.appendChild(p)}
+  d.pairs.slice().reverse().forEach(p=>{
+    const li=document.createElement("li"); const lab=TYPES[p.type]||["Frente","Verso"];
+    const f=document.createElement("div"); f.className="f"; const ft=document.createElement("span"); ft.className="t"; ft.textContent=lab[0]; f.append(ft,document.createTextNode(p.front));
+    const b=document.createElement("div"); b.className="b"; const bt=document.createElement("span"); bt.className="t"; bt.textContent=lab[1]; b.append(bt,document.createTextNode(p.back));
+    li.append(f,b);
+    const acts2=document.createElement("div"); acts2.className="pacts";
+    if(d.builtin&&!p.extra&&EDITS[p.id]){const tg=document.createElement("span"); tg.className="tagx"; tg.textContent="editada"; acts2.appendChild(tg)}
+    if(p.extra){const tg=document.createElement("span"); tg.className="tagx"; tg.textContent="sua cópia"; acts2.appendChild(tg)}
+    if(confirmDel===p.id){
+      acts2.append(button("Confirmar exclusão","btn small danger",()=>delPair(d,p)), button("Cancelar","btn small",()=>{confirmDel=null; renderDetail()}));
+    } else {
+      acts2.append(button("Editar","btn small",()=>{confirmDel=null; openCardEditor(p,d)}), button("Duplicar","btn small",()=>{confirmDel=null; dupPair(d,p)}), button("Copiar texto","btn small",()=>copyPair(p)));
+      if(!d.builtin||p.extra) acts2.appendChild(button("Excluir","btn small danger",()=>{confirmDel=p.id; renderDetail()}));
+    }
+    li.appendChild(acts2);
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+}
+$("btn-create-deck").addEventListener("click",()=>{
+  if(window.MJPlan&&!MJPlan.canAddDecks(1)){ MJPlan.upsell("own"); return; }
+  const name=$("new-deck-name").value.trim()||"Novo baralho";
+  const d={id:uid(),name,pairs:[]}; decks.push(d); persist(d); current=d.id; $("new-deck-name").value="";
+  renderDeckSelect(); renderDecks();
+});
+
+/* ---------- ocultar cronômetro e tela cheia (preferências do aparelho) ---------- */
+const LSU="mahjuris.ui.v1";
+let UI={}; try{UI=JSON.parse(localStorage.getItem(LSU)||"{}")||{}}catch(e){UI={}}
+function uiSave(){try{localStorage.setItem(LSU,JSON.stringify(UI))}catch(e){}}
+const ICONS={eye:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',eyeoff:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A9.8 9.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.9 3.8M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>',fs:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',fsx:'<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>'};
+function renderClockVis(){
+  const hid=!!UI.hideClock, b=$("btn-eye");
+  $("timer").classList.toggle("concealed",hid);
+  b.innerHTML=hid?ICONS.eyeoff:ICONS.eye;
+  b.setAttribute("aria-label",hid?"Mostrar cronômetro":"Ocultar cronômetro"); b.title=b.getAttribute("aria-label"); b.setAttribute("aria-pressed",hid?"true":"false");
+}
+function hasNativeFs(){return !!(window.MJAndroid&&window.MJAndroid.setFullscreen)}
+function isFs(){return hasNativeFs()?!!UI.fs:!!document.fullscreenElement}
+function applyFs(on){
+  if(hasNativeFs()){ try{window.MJAndroid.setFullscreen(!!on)}catch(e){} }
+  else if(on&&!document.fullscreenElement&&document.documentElement.requestFullscreen){ document.documentElement.requestFullscreen().catch(()=>{}); }
+  else if(!on&&document.fullscreenElement&&document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
+}
+function renderFsBtn(){
+  const on=isFs(), b=$("btn-fs");
+  b.innerHTML=on?ICONS.fsx:ICONS.fs;
+  b.setAttribute("aria-label",on?"Sair da tela cheia":"Jogar em tela cheia"); b.title=b.getAttribute("aria-label"); b.setAttribute("aria-pressed",on?"true":"false");
+}
+document.addEventListener("fullscreenchange",()=>{ if(!hasNativeFs()){ UI.fs=!!document.fullscreenElement; uiSave(); } renderFsBtn(); setTimeout(()=>{ if(G&&!$("view-play").hidden) renderBoard() },200); });
+function setView(v){
+  ["menu","play","decks","stats"].forEach(k=>{const el=$("view-"+k); el.hidden=k!==v; el.style.display=k===v?((k==="play"||k==="menu")?"flex":""):"none"});
+  $("hdr").hidden=v==="play";
+  $("tab-play").setAttribute("aria-pressed",v==="menu"); $("tab-decks").setAttribute("aria-pressed",v==="decks"); $("tab-stats").setAttribute("aria-pressed",v==="stats");
+  if(v==="play"){ if(UI.fs) applyFs(true); renderFsBtn(); renderClockVis(); } else if(isFs()) applyFs(false);
+  if(v==="play"&&G) renderBoard();
+  if(v==="menu") renderMenu();
+  window.scrollTo(0,0);
+}
+function renderMenu(){
+  const deck=deckById($("sel-deck").value), P=prog(deck.id), st=deckStatus(deck);
+  renderPhase();
+  const note=$("saved-note"), btn=$("btn-play"), disc=$("btn-discard-saved");
+  if(P.board&&Array.isArray(P.board.tiles)){
+    const left=P.board.tiles.filter(t=>t.a&&!t.d&&!t.decoy).length/2;
+    const modes={iniciante:"Iniciante",normal:"Normal",avancado:"Avançado"};
+    note.hidden=false; note.textContent="Você tem um jogo salvo da fase "+P.board.phase+": "+left+(left===1?" par restante":" pares restantes")+", "+clockT(P.board.ms||0)+" de jogo, modo "+(modes[P.board.mode]||P.board.mode)+". Ele continua com as configurações em que foi salvo.";
+    btn.textContent="Continuar jogo salvo"; disc.hidden=false;
+  } else {
+    disc.hidden=true;
+    if(!deck.pairs.length){ note.hidden=false; note.textContent="Este baralho está vazio. Adicione pares na aba Baralhos."; btn.textContent="Jogar"; }
+    else if(st.done){ note.hidden=false; note.textContent="Você já dominou todos os pares deste assunto."; btn.textContent="Recomeçar do zero"; }
+    else { note.hidden=true; btn.textContent="Jogar a fase "+st.phase; }
+  }
+  btn.disabled=!deck.pairs.length;
+  if(st.done&&!(P.board&&Array.isArray(P.board.tiles))) btn.textContent="Refazer o baralho inteiro";
+  const rb=$("btn-review"), rn=$("review-note"), sr=deck.temp?{due:[],later:[]}:srsOf(deck);
+  rb.hidden=!sr.due.length; rb.textContent="Revisar só as que errei ("+sr.due.length+")";
+  if(sr.due.length&&st.done){ rb.className="btn primary big"; btn.className="btn"; } else { rb.className="btn"; btn.className="btn primary big"; }
+  rn.hidden=!(sr.due.length||sr.later.length);
+  rn.textContent=sr.due.length?"Revisão espaçada: "+sr.due.length+(sr.due.length===1?" carta errada disponível":" cartas erradas disponíveis")+" para revisar hoje."+(sr.later.length?" Outras "+sr.later.length+" ficam disponíveis mais tarde.":"")
+    :sr.later.length?"Revisão espaçada: "+sr.later.length+(sr.later.length===1?" carta agendada":" cartas agendadas")+". A próxima fica disponível "+whenT(sr.next)+".":"";
+}
+function startGame(){
+  const deck=deckById($("sel-deck").value), P=prog(deck.id), size=+$("sel-size").value;
+  if(!deck.pairs.length) return;
+  if(window.MJPlan&&!MJPlan.deckOk(deck)){ MJPlan.upsell("deck"); return; }
+  if(P.board&&restoreGame(deck)){ setView("play"); return; }
+  if(deckStatus(deck).done) dropProg(deck.id);
+  if(Array.isArray(P.current)&&P.current.length&&P.current.length!==Math.min(size,deck.pairs.length)){ P.current=null; saveProg(deck.id); }
+  setView("play"); newGame();
+}
+function toMenu(){ hideOverlay(); tPause(); G=null; T.mat=null; T.phase=0; T.user=false; tRender(); renderDecksIfOpen(); setView("menu"); }
+function exitGame(){
+  if(!G||G.over){ toMenu(); return; }
+  const wasRun=T.run||T.wasRun; tPause();
+  const d=$("dialog"); d.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Sair do jogo";
+  const p=document.createElement("p"); p.style.margin="0";
+  p.textContent="Salve para continuar esta fase depois, do ponto onde parou. O tempo e os acertos desta partida entram nas estatísticas. Se descartar, a partida é apagada e não conta nas estatísticas.";
+  d.append(h,p);
+  const row=document.createElement("div"); row.className="row";
+  row.appendChild(button("Salvar e sair","btn primary",()=>{ commitSess(); saveBoard(); toMenu(); }));
+  row.appendChild(button("Descartar e sair","btn danger",()=>{ const P=prog(G.deckId); P.board=null; P.current=null; saveProg(G.deckId); toMenu(); }));
+  row.appendChild(button("Continuar jogando","btn",()=>{ hideOverlay(); if(wasRun) resumeIfIdle(); }));
+  d.appendChild(row); $("overlay").hidden=false;
+}
+$("tab-play").addEventListener("click",()=>setView("menu"));
+$("tab-decks").addEventListener("click",()=>{renderDecks(); setView("decks")});
+$("tab-stats").addEventListener("click",()=>{renderTempo(); setView("stats")});
+$("sel-mat").addEventListener("change",()=>{fillDecks($("sel-mat").value); renderMenu()});
+["sel-deck","sel-mode","sel-stack","sel-size"].forEach(id=>$(id).addEventListener("change",()=>renderMenu()));
+$("btn-play").addEventListener("click",startGame);
+$("btn-review").addEventListener("click",()=>playReview(deckById($("sel-deck").value)));
+$("btn-discard-saved").addEventListener("click",()=>{ const id=$("sel-deck").value, P=prog(id); P.board=null; P.current=null; saveProg(id); renderMenu(); });
+$("btn-exit").addEventListener("click",exitGame);
+$("btn-edit").addEventListener("click",editCard);
+$("btn-eye").addEventListener("click",()=>{ UI.hideClock=!UI.hideClock; uiSave(); renderClockVis(); });
+$("btn-fs").addEventListener("click",()=>{ const on=!isFs(); UI.fs=on; uiSave(); applyFs(on); renderFsBtn(); setTimeout(()=>{ if(G) renderBoard() },250); });
+window.mjBack=()=>{ if(isLocked()) return true; if(!$("overlay").hidden){ hideOverlay(); resumeIfIdle(); return true; } if(!$("view-play").hidden){ exitGame(); return true; } if($("view-menu").hidden){ setView("menu"); return true; } return false; };
+$("btn-resume").addEventListener("click",userResume);
+$("btn-shuffle").addEventListener("click",reshuffle);
+$("overlay").addEventListener("click",e=>{if(e.target===$("overlay")&&!isLocked()){ hideOverlay(); resumeIfIdle(); }});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!isLocked()){ hideOverlay(); resumeIfIdle(); }});
+let rz; window.addEventListener("resize",()=>{clearTimeout(rz); rz=setTimeout(()=>{if(G&&!$("view-play").hidden) renderBoard()},150)});
+
+/* ---------- importar do Anki (.apkg) ---------- */
+const LIBS={zip:"lib/jszip.min.js",
+  sql:"lib/sql-asm-memory-growth.js",
+  zstd:"lib/fzstd.js"};
+const loaded={};
+function loadScript(src){ if(loaded[src]) return loaded[src];
+  return loaded[src]=new Promise((ok,bad)=>{const s=document.createElement("script"); s.src=src; s.onload=ok; s.onerror=()=>{delete loaded[src]; bad(new Error("lib"))}; document.head.appendChild(s)}); }
+function ankiText(html){
+  const h=String(html).replace(/\[sound:[^\]]*\]/g," ").replace(/<\s*(br|\/div|\/p|\/li)[^>]*>/gi," ");
+  const doc=new DOMParser().parseFromString("<body>"+h+"</body>","text/html");
+  return (doc.body.textContent||"").replace(/ /g," ").replace(/\s+/g," ").trim();
+}
+const CLOZE=/\{\{c\d+::([\s\S]*?)(?:::([\s\S]*?))?\}\}/g;
+async function parseApkg(file){
+  await loadScript(LIBS.zip);
+  const zip=await JSZip.loadAsync(file);
+  const name=["collection.anki21b","collection.anki21","collection.anki2"].find(n=>zip.file(n));
+  if(!name) throw new Error("Este arquivo não tem uma coleção do Anki dentro. Exporte de novo no Anki como \"Pacote de baralho (.apkg)\".");
+  let bytes=await zip.file(name).async("uint8array");
+  if(name.endsWith("b")){ await loadScript(LIBS.zstd); bytes=fzstd.decompress(bytes); }
+  await loadScript(LIBS.sql);
+  const SQL=await initSqlJs();
+  const db=new SQL.Database(bytes);
+  try{
+    const deckNames=new Map();
+    try{ const r=db.exec("select id,name from decks"); (r[0]?r[0].values:[]).forEach(([id,n])=>deckNames.set(String(id),String(n).split("\x1f").join("::"))); }
+    catch(e){ const r=db.exec("select decks from col"); const j=JSON.parse(r[0].values[0][0]); Object.values(j).forEach(d=>deckNames.set(String(d.id),d.name)); }
+    // nome dos campos de cada tipo de nota (para achar um campo "Tipo", como nos baralhos Mahjuris)
+    const tipoIdx=new Map();
+    try{ const fr=db.exec("select ntid,ord,name from fields"); (fr[0]?fr[0].values:[]).forEach(([nt,o,n])=>{if(/^tipo$/i.test(String(n).trim())) tipoIdx.set(String(nt),o)}); }
+    catch(e){ try{ const mr=db.exec("select models from col"); Object.values(JSON.parse(mr[0].values[0][0])).forEach(m=>{(m.flds||[]).forEach(f=>{if(/^tipo$/i.test(String(f.name).trim())) tipoIdx.set(String(m.id),f.ord)})}); }catch(e2){} }
+    const r=db.exec("select n.flds, min(c.did), n.mid from notes n join cards c on c.nid=n.id group by n.id order by n.id");
+    const groups=new Map(); let skipped=0;
+    (r[0]?r[0].values:[]).forEach(([flds,did,mid])=>{
+      const f=String(flds).split("\x1f");
+      const ti=tipoIdx.get(String(mid)), tipo=ti!=null?ankiText(f[ti]||"").toLowerCase():"";
+      const type=/^pergunta/.test(tipo)?"pergunta":/^lei/.test(tipo)?"lei":/^conceito/.test(tipo)?"conceito":/^palavra/.test(tipo)?"palavra":/^artigo/.test(tipo)?"artigo":"anki";
+      let front,back;
+      if(CLOZE.test(f[0])){ CLOZE.lastIndex=0;
+        const ans=[]; const q=f[0].replace(CLOZE,(m,a,hint)=>{ans.push(ankiText(a)); return hint?"[… "+hint+"]":"[…]"});
+        front=ankiText(q); back=ans.join(" · ");
+      } else { front=ankiText(f[0]||""); back=ankiText(f[1]||""); }
+      CLOZE.lastIndex=0;
+      if(!front||!back){skipped++;return}
+      const dn=deckNames.get(String(did))||"Anki";
+      if(!groups.has(dn)) groups.set(dn,[]);
+      groups.get(dn).push({id:uid(),type,front,back});
+    });
+    return {groups:[...groups.entries()].map(([full,pairs])=>({full,name:full.split("::").pop().trim()||full,group:full.includes("::")?full.split("::")[0].replace(/\s*\(Mahjuris\)\s*$/,"").trim():"",pairs,ce:pairs.filter(x=>/^\s*(❌|✅|✔|✖|✗|✓|certo\b|errado\b|correto\b|incorreto\b|verdadeiro\b|falso\b|\(?[CE]\)?\s*[-–:.])/i.test(x.back)).length/pairs.length>0.3})).map(g=>(g.on=!g.ce,g)).sort((a,b)=>a.full.localeCompare(b.full,"pt-BR",{numeric:true})),skipped,file:file.name};
+  } finally { db.close(); }
+}
+/* planilhas: .xlsx lido com JSZip (sem biblioteca extra) e .csv */
+async function parseXlsx(file){
+  await loadScript(LIBS.zip);
+  const zip=await JSZip.loadAsync(file);
+  const X=async n=>{const f=zip.file(n); return f?new DOMParser().parseFromString(await f.async("string"),"application/xml"):null};
+  const T=(el,n)=>[...el.getElementsByTagNameNS("*",n)];
+  const wb=await X("xl/workbook.xml"); if(!wb) throw new Error("Este arquivo não parece uma planilha .xlsx. No Excel, use Salvar como > Pasta de Trabalho do Excel (.xlsx).");
+  const shared=[]; const ss=await X("xl/sharedStrings.xml");
+  if(ss) T(ss,"si").forEach(si=>shared.push(T(si,"t").filter(t=>!t.parentNode||t.parentNode.localName!=="rPh").map(t=>t.textContent).join("")));
+  const rels={}; const rl=await X("xl/_rels/workbook.xml.rels");
+  if(rl) T(rl,"Relationship").forEach(r=>{rels[r.getAttribute("Id")]=r.getAttribute("Target")});
+  const col=ref=>{const m=/^([A-Z]+)/.exec(ref||""); if(!m) return -1; let n=0; for(const ch of m[1]) n=n*26+ch.charCodeAt(0)-64; return n-1};
+  const sheets=[];
+  for(const sh of T(wb,"sheet")){
+    let rid=sh.getAttribute("r:id"); if(!rid){ for(const a of sh.attributes) if(a.localName==="id") rid=a.value; }
+    let tg=rels[rid]||""; if(!tg) continue; tg=tg.startsWith("/")?tg.slice(1):"xl/"+tg.replace(/^\.\//,"");
+    const doc=await X(tg); if(!doc) continue;
+    const rows=[];
+    T(doc,"row").forEach(r=>{ const row=[]; let k=0;
+      T(r,"c").forEach(c=>{ const i=col(c.getAttribute("r")); const at=i>=0?i:k; k=at+1;
+        const t=c.getAttribute("t"); const v=T(c,"v")[0];
+        let val="";
+        if(t==="s") val=v?shared[+v.textContent]||"":"";
+        else if(t==="inlineStr") val=T(c,"t").map(x=>x.textContent).join("");
+        else val=v?v.textContent:"";
+        row[at]=val; });
+      rows.push([...row].map(x=>x==null?"":String(x))); });
+    sheets.push({name:sh.getAttribute("name")||"",rows});
+  }
+  return sheets;
+}
+function parseCsv(text){
+  text=text.replace(/^﻿/,"");
+  const first=text.split(/\r?\n/)[0]||"";
+  const cnt=ch=>first.split(ch).length-1;
+  const del=["\t",";",","].sort((a,b)=>cnt(b)-cnt(a))[0];
+  const rows=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cur+='"'; i++} else q=false } else cur+=ch; }
+    else if(ch==='"' && cur==="") q=true;
+    else if(ch===del){ row.push(cur); cur=""; }
+    else if(ch==="\n"||ch==="\r"){ if(ch==="\r"&&text[i+1]==="\n") i++; row.push(cur); rows.push(row); row=[]; cur=""; }
+    else cur+=ch; }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return [{name:"",rows}];
+}
+const nkey=s=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
+const XCOLS={front:["carta_a","pergunta","frente","front","questao","enunciado","termo"],back:["carta_b","resposta","verso","back","gabarito","definicao","significado"],
+  group:["materia","disciplina"],deck:["topico","assunto","baralho","deck"],sub:["subtopico","sub_topico","subassunto"],fund:["fundamento","fonte","base_legal","referencia"],type:["tipo_par","tipo"]};
+function tableToGroups(sheets,fileName){
+  let pick=null;
+  for(const sh of sheets){ for(let r=0;r<Math.min(6,sh.rows.length);r++){ const h=sh.rows[r].map(nkey); const m={};
+      Object.entries(XCOLS).forEach(([k,names])=>{ for(const n of names){ const i=h.indexOf(n); if(i>=0){m[k]=i; break} } });
+      if(m.front!=null&&m.back!=null){ pick={sh,start:r+1,m}; break } }
+    if(pick) break; }
+  if(!pick){ const sh=sheets.find(x=>x.rows.some(r=>r.filter(c=>String(c).trim()).length>=2)); if(!sh) return {groups:[],skipped:0,file:fileName}; pick={sh,start:0,m:{front:0,back:1}}; }
+  const {sh,start,m}=pick; const base=fileName.replace(/\.[^.]+$/,"").replace(/[_]+/g," ").trim()||"Baralho importado";
+  const get=(row,k)=>m[k]!=null?String(row[m[k]]==null?"":row[m[k]]).replace(/\s+/g," ").trim():"";
+  const groups=new Map(); let skipped=0;
+  sh.rows.slice(start).forEach(row=>{
+    let front=get(row,"front"), back=get(row,"back");
+    if(!front&&!back) return; if(!front||!back){skipped++; return}
+    const fund=get(row,"fund"), tp=nkey(get(row,"type"));
+    if(fund&&!back.includes(fund)) back+=" ("+fund+")";
+    const am=/^(.*?\bart(?:igo)?s?\.?\s*\d+(?:-[A-Z])?)/i.exec(fund);
+    const sub=get(row,"sub")||(am?am[1]:fund);
+    const type=/^pergunta/.test(tp)?"pergunta":/^lei/.test(tp)?"lei":/^conceito/.test(tp)?"conceito":/^palavra/.test(tp)?"palavra":/^artigo/.test(tp)?"artigo":"pergunta";
+    const group=get(row,"group"), deck=get(row,"deck").replace(/\s*\(Mahjuris\)\s*$/,"")||base;
+    const key=(group?group+"::":"")+deck;
+    if(!groups.has(key)) groups.set(key,{full:key,name:deck,group,pairs:[],on:true});
+    const pr={id:uid(),type,front,back}; if(sub) pr.sub=sub; groups.get(key).pairs.push(pr);
+  });
+  return {groups:[...groups.values()].sort((a,b)=>a.full.localeCompare(b.full,"pt-BR",{numeric:true})),skipped,file:fileName,sheet:sh.name};
+}
+async function parseAnyFile(f){
+  const ext=(f.name.split(".").pop()||"").toLowerCase();
+  if(ext==="apkg"||ext==="colpkg") return parseApkg(f);
+  if(ext==="xlsx"||ext==="xlsm") return tableToGroups(await parseXlsx(f),f.name);
+  if(ext==="csv"||ext==="tsv"||ext==="txt") return tableToGroups(parseCsv(await f.text()),f.name);
+  if(ext==="xls") throw new Error("Arquivos .xls antigos não são lidos. No Excel, use Salvar como > Pasta de Trabalho do Excel (.xlsx) e carregue de novo.");
+  throw new Error("Formato não reconhecido. Use uma planilha .xlsx, um .csv ou um pacote do Anki (.apkg).");
+}
+let importing=null;
+function renderImport(){
+  const box=$("imp-preview"); box.innerHTML="";
+  if(!importing) return;
+  const total=importing.groups.reduce((n,g)=>n+g.pairs.length,0);
+  const p=document.createElement("p"); p.className="note";
+  p.textContent=total+" pares em "+importing.groups.length+(importing.groups.length===1?" baralho":" baralhos")+(importing.skipped?". "+importing.skipped+" cartas ficaram de fora porque um dos lados estava vazio"+(/\.(apkg|colpkg)$/i.test(importing.file)?" ou só tinha imagem.":"."):".");
+  box.appendChild(p);
+  importing.groups.forEach((g,i)=>{
+    const lab=document.createElement("label"); lab.className="impdeck";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.id="imp-g"+i; cb.checked=g.on!==false; cb.addEventListener("change",()=>{g.on=cb.checked});
+    const t=document.createElement("span"); t.textContent=(g.group?g.group+" \u203a ":"")+g.name;
+    const c=document.createElement("small"); c.textContent=g.pairs.length;
+    lab.append(cb,t,c); box.appendChild(lab);
+    if(g.ce){const w=document.createElement("p"); w.className="note warn"; w.textContent="Parece um baralho de certo ou errado: o verso corrige a frente em vez de responder a ela. Ficou desmarcado; marque se quiser importar mesmo assim."; box.appendChild(w)}
+  });
+  if(importing.groups.length>1){
+    const lab=document.createElement("label"); lab.className="impdeck";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.id="imp-merge"; cb.checked=!!importing.merge; cb.addEventListener("change",()=>{importing.merge=cb.checked});
+    const t=document.createElement("span"); t.textContent="Juntar os marcados num baralho só";
+    lab.append(cb,t); box.appendChild(lab);
+  }
+  const row=document.createElement("div"); row.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
+  row.appendChild(button("Importar","btn small primary",doImport));
+  row.appendChild(button("Cancelar","btn small",()=>{importing=null; $("imp-file").value=""; $("imp-msg").textContent=""; renderImport()}));
+  box.appendChild(row);
+}
+function doImport(){
+  const sel=importing.groups.filter(g=>g.on!==false);
+  if(!sel.length){$("imp-msg").textContent="Marque pelo menos um baralho."; return}
+  const made=[];
+  if(importing.merge&&sel.length>1){
+    const top=sel[0].full.split("::")[0];
+    const m={id:uid(),name:sel[0].group||top.replace(/\s*\(Mahjuris\)\s*$/,""),pairs:sel.flatMap(g=>g.pairs)}; if(sel[0].group) m.group=sel[0].group; made.push(m);
+  } else sel.forEach(g=>{const m={id:uid(),name:g.name,pairs:g.pairs}; if(g.group) m.group=g.group; made.push(m)});
+  if(window.MJPlan&&!MJPlan.canAddDecks(made.length)){ MJPlan.upsell("own"); return; }
+  if(window.MJPlan&&made.some(d=>d.pairs.length>MJPlan.maxCards())){ MJPlan.upsell("cards"); return; }
+  made.forEach(d=>{decks.push(d); persist(d)});
+  const n=made.reduce((a,d)=>a+d.pairs.length,0);
+  importing=null; $("imp-file").value="";
+  current=made[0].id; renderDeckSelect(); renderDecks(); renderImport();
+  $("imp-msg").textContent=made.length+(made.length===1?" baralho importado":" baralhos importados")+" com "+n+" pares.";
+}
+$("imp-file").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const msg=$("imp-msg"); msg.textContent="Lendo "+f.name+"…"; importing=null; renderImport();
+  try{
+    importing=await parseAnyFile(f);
+    if(!importing.groups.length){importing=null; msg.textContent="Nenhum cartão com frente e verso foi encontrado neste arquivo."; return}
+    msg.textContent=""; renderImport();
+  }catch(err){
+    importing=null;
+    msg.textContent=err&&err.message&&err.message!=="lib"&&!/^[a-z]/.test(err.message)?err.message:"Não consegui ler este arquivo. Confira se é uma planilha .xlsx, um .csv ou um .apkg exportado pelo Anki e tente de novo.";
+  }
+});
+
+$("tm-btn").addEventListener("click",()=>{ if(T.user) userResume(); else userPause(); });
+tRender();
+renderDeckSelect(); renderDecks(); setView("menu"); initRemote();
+};
+if(!window.MJSync) window.MJ_START();
+if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>

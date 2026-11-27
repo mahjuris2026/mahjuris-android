@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahjuris · Criar cards</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d4f7a">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="fonts.css">
+<script src="config.js"></script>
+<script src="lib/supabase.js"></script>
+<script src="sync.js"></script>
+<script src="plan.js"></script>
+<style>
+:root{
+  --bg:#e4ebea; --panel:#f6f9f8; --fg:#15242a; --muted:#56696e; --line:#c3cfcf;
+  --ink:#1d4f7a; --ox:#8c2d2a; --ok:#2c7a4d; --err:#b3261e; --hint:#c98a12; --field:#fff;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e191d; --panel:#15242a; --fg:#e2ebec; --muted:#93a7ac; --line:#2a3d43;
+  --ink:#86b6e4; --ox:#e7948a; --ok:#6fcf97; --err:#ff8a80; --hint:#f2c14e; --field:#0e191d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e191d; --panel:#15242a; --fg:#e2ebec; --muted:#93a7ac; --line:#2a3d43;
+  --ink:#86b6e4; --ox:#e7948a; --ok:#6fcf97; --err:#ff8a80; --hint:#f2c14e; --field:#0e191d; color-scheme:dark}
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--f-body);padding:14px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;justify-content:space-between}
+header h1{font:800 1.8rem/1 var(--f-display);letter-spacing:-.02em;margin:0} header h1 span{color:var(--ox)}
+header p{margin:4px 0 0;color:var(--muted)}
+.hbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#mj-acc-host{display:flex}
+.btn{font:600 .9rem var(--f-body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--fg);text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.btn.danger{color:var(--err)} .btn.small{padding:5px 10px;font-size:.82rem}
+.btn:disabled{opacity:.5;cursor:default}
+.grid{display:grid;grid-template-columns:280px 1fr;gap:14px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+h2{font:700 1.1rem var(--f-display);margin:0}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+input[type=text],textarea,select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--fg);width:100%;min-width:0}
+textarea{resize:vertical;min-height:58px}
+.decks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.decks .g{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-top:8px}
+.decks button{width:100%;text-align:left;font:inherit;padding:8px 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--fg);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.decks button[aria-current=true]{background:var(--bg);border-color:var(--line);font-weight:600}
+.decks small{color:var(--muted)}
+.note{color:var(--muted);font-size:.86rem;margin:0}
+.msg{margin:0;min-height:1.2em;font-size:.9rem} .msg.err{color:var(--err)} .msg.ok{color:var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.row .field{flex:1 1 180px}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;grid-template-columns:120px 1fr 1fr;gap:8px;background:var(--bg)}
+.card .full{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.card .cnt{font-size:.75rem;color:var(--muted)} .card .cnt.warn{color:var(--hint)}
+@media (max-width:640px){.card{grid-template-columns:1fr}}
+.empty{padding:20px;text-align:center;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Mah<span>juris</span></h1><p>Criar cards: monte os seus baralhos aqui e jogue no site ou no app.</p></div>
+    <div class="hbtns"><a class="btn" href="index.html">Ir para o jogo</a><span id="mj-acc-host"></span></div>
+  </header>
+  <div class="grid">
+    <div class="panel">
+      <h2>Seus baralhos</h2>
+      <ul class="decks" id="decks"></ul>
+      <div class="field" style="border-top:1px solid var(--line);padding-top:12px"><label for="nd-mat">Matéria</label><input type="text" id="nd-mat" list="mats" placeholder="Ex.: Direito Penal"><datalist id="mats"></datalist></div>
+      <div class="field"><label for="nd-name">Assunto (nome do baralho)</label><input type="text" id="nd-name" placeholder="Ex.: Crimes contra a administração"></div>
+      <button class="btn primary" id="nd-btn" type="button">Criar baralho</button>
+      <p class="msg" id="nd-msg" aria-live="polite"></p>
+      <p class="note" id="limits"></p>
+    </div>
+    <div class="panel" id="detail"></div>
+  </div>
+</div>
+<script>
+window.MJ_START=function(){
+"use strict";
+const LS="mahjuris.decks.v1";
+const TYPES={pergunta:["Pergunta","Resposta"],lei:["Lei","Assunto"],artigo:["Artigo","Conteúdo"],conceito:["Conceito","Definição"],palavra:["Palavra","Significado"]};
+const LIM=60; // acima disso a peça fica difícil de ler
+const $=id=>document.getElementById(id);
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+let decks=read(), cur=decks[0]&&decks[0].id, lastEdit=0, saveT=null;
+function read(){try{const v=JSON.parse(localStorage.getItem(LS)||"[]");return Array.isArray(v)?v:[]}catch(e){return []}}
+function save(d){ if(d) d.updatedAt=Date.now(); try{localStorage.setItem(LS,JSON.stringify(decks))}catch(e){ msg("nd-msg","Não deu para salvar: o armazenamento do navegador está cheio.","err") } }
+function saveSoon(d){ lastEdit=Date.now(); clearTimeout(saveT); saveT=setTimeout(()=>save(d),600); }
+window.MJ_IDLE=()=>Date.now()-lastEdit>20000&&!(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+function msg(id,t,c){const e=$(id); e.textContent=t; e.className="msg"+(c?" "+c:"")}
+function el(tag,attrs,...kids){const e=document.createElement(tag); for(const [k,v] of Object.entries(attrs||{})){ if(k==="text") e.textContent=v; else if(k.startsWith("on")) e.addEventListener(k.slice(2),v); else e.setAttribute(k,v);} kids.flat().forEach(c=>c!=null&&e.append(c)); return e;}
+const P=window.MJPlan;
+function renderLimits(){
+  if(!P||P.premium()){ $("limits").textContent=P?"Plano Premium: baralhos e cartas sem limite.":""; return; }
+  const L=P.limits; $("limits").textContent="Plano Free: até "+L.baralhosProprios+" baralhos seus, com até "+L.cartasPorBaralho+" cartas cada.";
+}
+function renderList(){
+  const ul=$("decks"); ul.innerHTML="";
+  if(!decks.length){ ul.append(el("li",{class:"note",text:"Você ainda não tem baralhos. Crie o primeiro abaixo."})); }
+  const groups=new Map(); decks.forEach(d=>{const g=d.group||"Seus baralhos"; if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(d)});
+  [...groups.keys()].sort((a,b)=>a.localeCompare(b,"pt-BR")).forEach(g=>{
+    ul.append(el("li",{class:"g",text:g}));
+    groups.get(g).forEach(d=>ul.append(el("li",{},el("button",{type:"button","aria-current":String(d.id===cur),onclick:()=>{cur=d.id; renderAll()}},el("span",{text:d.name}),el("small",{text:String(d.pairs.length)})))));
+  });
+  const dl=$("mats"); dl.innerHTML=""; [...new Set(decks.map(d=>d.group).filter(Boolean))].forEach(m=>dl.append(el("option",{value:m})));
+}
+function cardEl(d,p,i){
+  const lab=TYPES[p.type]||TYPES.pergunta;
+  const tSel=el("select",{"aria-label":"Tipo do par"}); Object.entries(TYPES).forEach(([k,v])=>tSel.append(el("option",{value:k,text:v[0]+" / "+v[1]}))); tSel.value=TYPES[p.type]?p.type:"pergunta";
+  const fa=el("textarea",{"aria-label":lab[0]}), fb=el("textarea",{"aria-label":lab[1]}), fs=el("input",{type:"text","aria-label":"Fundamento (opcional)",placeholder:"Fundamento, ex.: CP, art. 312 (opcional)"});
+  fa.value=p.front||""; fb.value=p.back||""; fs.value=p.sub||"";
+  const ca=el("span",{class:"cnt"}), cb=el("span",{class:"cnt"});
+  const cnt=()=>{ [[fa,ca],[fb,cb]].forEach(([f,c])=>{const n=f.value.length; c.textContent=n+" caracteres"+(n>LIM?" (longo: pode ficar pequeno na peça)":""); c.className="cnt"+(n>LIM?" warn":"")}) };
+  cnt();
+  const upd=()=>{ p.type=tSel.value; p.front=fa.value.trim(); p.back=fb.value.trim(); const s=fs.value.trim(); if(s) p.sub=s; else delete p.sub; cnt(); saveSoon(d); };
+  [fa,fb,fs].forEach(x=>x.addEventListener("input",upd)); tSel.addEventListener("change",()=>{upd(); renderDetail()});
+  let armed=false; const del=el("button",{type:"button",class:"btn small danger",text:"Excluir",onclick:()=>{ if(!armed){armed=true; del.textContent="Confirmar exclusão"; setTimeout(()=>{armed=false; del.textContent="Excluir"},4000); return;} d.pairs.splice(d.pairs.indexOf(p),1); save(d); renderAll(); }});
+  return el("div",{class:"card"},
+    el("div",{class:"field"},el("label",{text:"Tipo"}),tSel),
+    el("div",{class:"field"},el("label",{text:lab[0]}),fa,ca),
+    el("div",{class:"field"},el("label",{text:lab[1]}),fb,cb),
+    el("div",{class:"full"},el("div",{class:"field",style:"flex:1 1 220px"},fs),el("span",{class:"note",text:"#"+(i+1)}),del));
+}
+function canAddCards(d,n){ if(!P) return true; if(d.pairs.length+n>P.maxCards()){ P.upsell("cards"); return false; } return true; }
+function renderDetail(){
+  const box=$("detail"); box.innerHTML="";
+  const d=decks.find(x=>x.id===cur);
+  if(!d){ box.append(el("div",{class:"empty",text:"Escolha ou crie um baralho para começar a escrever os cards."})); return; }
+  const locked=P&&!P.deckOk(d);
+  const nm=el("input",{type:"text",id:"dk-name"}), mt=el("input",{type:"text",id:"dk-mat",list:"mats"}); nm.value=d.name; mt.value=d.group||"";
+  nm.addEventListener("input",()=>{d.name=nm.value.trim()||"Sem nome"; saveSoon(d); clearTimeout(window.__rl); window.__rl=setTimeout(renderList,700)});
+  mt.addEventListener("input",()=>{const g=mt.value.trim(); if(g) d.group=g; else delete d.group; saveSoon(d); clearTimeout(window.__rl); window.__rl=setTimeout(renderList,700)});
+  box.append(el("div",{class:"row"},el("div",{class:"field"},el("label",{for:"dk-name",text:"Assunto (nome do baralho)"}),nm),el("div",{class:"field"},el("label",{for:"dk-mat",text:"Matéria"}),mt)));
+  if(locked) box.append(el("p",{class:"msg err",text:"Este baralho passou do limite do plano Free: dá para editar aqui, mas para jogar com ele é preciso o Premium."}));
+  const add=el("button",{type:"button",class:"btn primary",text:"Adicionar card",onclick:()=>{ if(!canAddCards(d,1)) return; const p={id:uid(),type:(d.pairs[d.pairs.length-1]||{}).type||"pergunta",front:"",back:""}; d.pairs.push(p); save(d); renderAll(); const t=box.querySelectorAll(".card textarea"); if(t.length) t[t.length-2].focus(); }});
+  const exp=el("button",{type:"button",class:"btn",text:"Baixar como planilha (CSV)",onclick:()=>exportCsv(d)});
+  let armed=false; const delD=el("button",{type:"button",class:"btn danger",text:"Excluir baralho",onclick:()=>{ if(!armed){armed=true; delD.textContent="Confirmar: excluir "+d.pairs.length+" cards"; setTimeout(()=>{armed=false; delD.textContent="Excluir baralho"},5000); return;} decks=decks.filter(x=>x!==d); save(); cur=decks[0]&&decks[0].id; renderAll(); }});
+  box.append(el("div",{class:"row"},add,exp,delD));
+  // colar de uma planilha
+  const ta=el("textarea",{id:"paste",rows:"4",placeholder:"Pergunta[TAB]Resposta[TAB]Fundamento\nPrazo do inquérito com preso?\t10 dias\tCPP, art. 10"});
+  const pm=el("p",{class:"msg","aria-live":"polite"});
+  const pb=el("button",{type:"button",class:"btn small",text:"Adicionar as linhas coladas",onclick:()=>{
+    const rows=ta.value.split(/\r?\n/).map(l=>l.includes("\t")?l.split("\t"):l.split(";")).map(c=>c.map(x=>x.trim())).filter(c=>c[0]&&c[1]);
+    if(!rows.length){ pm.className="msg err"; pm.textContent="Nenhuma linha com pergunta e resposta separadas por TAB (ou ponto e vírgula)."; return; }
+    if(!canAddCards(d,rows.length)) return;
+    rows.forEach(c=>{ const p={id:uid(),type:"pergunta",front:c[0],back:c[1]}; if(c[2]) p.sub=c[2]; d.pairs.push(p); });
+    save(d); ta.value=""; renderAll(); const m=document.querySelector("#detail .msg.ok"); void m;
+  }});
+  box.append(el("details",{},el("summary",{text:"Colar várias de uma vez (do Excel ou do Word)"}),
+    el("div",{style:"display:flex;flex-direction:column;gap:8px;margin-top:8px"},el("p",{class:"note",text:"Uma carta por linha. Copie duas ou três colunas do Excel (pergunta, resposta e, se quiser, fundamento) e cole aqui. Também vale separar com ponto e vírgula."}),ta,pb,pm)));
+  const list=el("div",{class:"cards"});
+  if(!d.pairs.length) list.append(el("div",{class:"empty",text:"Nenhum card ainda. Use Adicionar card ou cole várias linhas."}));
+  d.pairs.forEach((p,i)=>list.append(cardEl(d,p,i)));
+  box.append(el("p",{class:"note",text:d.pairs.length+(d.pairs.length===1?" card":" cards")+". As mudanças são salvas sozinhas e vão para a sua conta."}),list);
+  if(d.pairs.length>3) box.append(el("div",{class:"row"},el("button",{type:"button",class:"btn primary",text:"Adicionar card",onclick:()=>add.click()})));
+}
+function exportCsv(d){
+  const q=s=>'"'+String(s||"").replace(/"/g,'""')+'"';
+  const lines=[["materia","assunto","tipo_par","carta_a","carta_b","fundamento"].join(",")].concat(d.pairs.map(p=>[d.group||"",d.name,p.type,p.front,p.back,p.sub||""].map(q).join(",")));
+  const blob=new Blob(["﻿"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=el("a",{href:URL.createObjectURL(blob),download:(d.name||"baralho").replace(/[^\w\-]+/g,"_")+".csv"}); document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove()},1000);
+}
+function renderAll(){ renderList(); renderDetail(); renderLimits(); }
+$("nd-btn").addEventListener("click",()=>{
+  if(P&&!P.canAddDecks(1)){ P.upsell("own"); return; }
+  const name=$("nd-name").value.trim(), g=$("nd-mat").value.trim();
+  if(!name){ msg("nd-msg","Dê um nome ao baralho.","err"); $("nd-name").focus(); return; }
+  const d={id:uid(),name,pairs:[]}; if(g) d.group=g; decks.push(d); save(d); cur=d.id; $("nd-name").value=""; msg("nd-msg","Baralho criado.","ok"); renderAll();
+});
+window.addEventListener("storage",e=>{ if(e.key===LS){ decks=read(); if(!decks.some(d=>d.id===cur)) cur=decks[0]&&decks[0].id; renderAll(); } });
+window.addEventListener("pagehide",()=>{ clearTimeout(saveT); const d=decks.find(x=>x.id===cur); if(Date.now()-lastEdit<2000) save(d); });
+renderAll();
+};
+if(!window.MJSync) window.MJ_START();
+if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Mahjuris",
+  "short_name": "Mahjuris",
+  "description": "Estude para concursos jogando: junte cada pergunta com a sua resposta.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e4ebea",
+  "theme_color": "#1d4f7a",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
