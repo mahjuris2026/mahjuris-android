@@ -12,6 +12,7 @@
 <script src="lib/supabase.js"></script>
 <script src="sync.js"></script>
 <script src="plan.js"></script>
+<script src="social.js"></script>
 <style>
 /* Layout: mesa de estudo em ardósia; peças de marfim empilhadas em camadas, leitor da peça embaixo. */
 :root{
@@ -190,6 +191,49 @@ textarea{resize:vertical;min-height:64px;width:100%}
 .st-sublist li b{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
 .st-sublist li.bad b{color:var(--err)}
 .statlist li.tot{border-top:1px solid var(--line);padding-top:12px}
+@media (max-width:520px){.tabs{flex-wrap:wrap}.tabs button{padding:7px 10px}}
+.picklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px}
+.picklist label{display:flex;gap:8px;align-items:flex-start;font-size:.86rem;padding:4px 6px;border-radius:6px;cursor:pointer}
+.picklist label:hover{background:var(--bg)}
+.picklist input{margin-top:3px;flex:none}
+.picklist .pk-f{color:var(--ink)} .picklist .pk-b{color:var(--ox)}
+.picklist small{display:block;color:var(--muted);font-size:.72rem}
+.dialog .col{display:flex;flex-direction:column;gap:8px}
+.dialog .col .btn{text-align:left}
+.decklist .bulk{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer}
+.decklist .bulk span{flex:1;min-width:0}
+.decklist .bulk small{color:var(--muted)}
+.hidbox summary{cursor:pointer;font-size:.86rem;color:var(--muted)}
+.hidbox ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:.88rem}
+.hidbox li{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dy-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.dy-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.dy-card span{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.dy-card b{font:800 1.3rem/1.15 var(--f-display);font-variant-numeric:tabular-nums}
+.dy-card small{color:var(--muted);font-size:.8rem}
+.dy-stw{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.dy-stw .clock{font:800 2rem/1 var(--f-display);font-variant-numeric:tabular-nums}
+.dy-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.dy-row input[type=number],.dy-row input[type=date]{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:7.5em}
+.dy-row input[type=date]{width:auto}
+.dy-bars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;height:130px;padding-top:6px}
+.dy-bar{display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;height:100%;gap:2px;min-width:0}
+.dy-bar i{display:block;border-radius:4px 4px 0 0;min-height:0}
+.dy-bar i.g{background:var(--ink)} .dy-bar i.s{background:var(--ok);border-radius:4px 4px 0 0}
+.dy-bar i.g+i.s{border-radius:0} 
+.dy-bar em{font-style:normal;font-size:.7rem;color:var(--muted);text-align:center;margin-top:2px}
+.dy-bar.today em{color:var(--fg);font-weight:700}
+.dy-leg{display:flex;gap:14px;font-size:.8rem;color:var(--muted);flex-wrap:wrap}
+.dy-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.dy-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dy-hist details{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.dy-hist summary{cursor:pointer;display:flex;justify-content:space-between;gap:10px;list-style:none}
+.dy-hist summary::-webkit-details-marker{display:none}
+.dy-hist summary b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dy-hist ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:.84rem}
+.dy-hist ul li{display:flex;justify-content:space-between;gap:10px}
+.dy-hist ul li span{min-width:0}
+.dy-hist ul li b{white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
 </style>
 
 <div class="wrap" lang="pt-BR">
@@ -198,6 +242,8 @@ textarea{resize:vertical;min-height:64px;width:100%}
     <div class="tabs" role="group" aria-label="Seção">
       <button id="tab-play" aria-pressed="true">Jogar</button>
       <button id="tab-decks" aria-pressed="false">Baralhos</button>
+      <button id="tab-diary" aria-pressed="false">Diário</button>
+      <button id="tab-rank" aria-pressed="false">Ranking</button>
       <button id="tab-stats" aria-pressed="false">Estatísticas</button>
     </div>
   </header>
@@ -218,7 +264,7 @@ textarea{resize:vertical;min-height:64px;width:100%}
       <div class="field"><label for="sel-stack">Tipo de tabuleiro</label>
         <select id="sel-stack"><option value="1" selected>Empilhado (camadas de mahjong)</option><option value="0">Plano</option></select></div>
       <p class="note" id="saved-note" hidden></p>
-      <div class="menubtns"><button class="btn primary big" id="btn-play" type="button">Jogar</button><button class="btn danger" id="btn-discard-saved" type="button" hidden>Descartar jogo salvo</button><button class="btn" id="btn-review" type="button" hidden>Revisar</button></div>
+      <div class="menubtns"><button class="btn primary big" id="btn-play" type="button">Jogar</button><button class="btn danger" id="btn-discard-saved" type="button" hidden>Descartar jogo salvo</button><button class="btn" id="btn-review" type="button" hidden>Revisar</button><button class="btn" id="btn-replay" type="button">Refazer ou escolher cartas</button></div>
       <p class="note" id="review-note" hidden></p>
     </div>
       <details class="assume">
@@ -231,7 +277,7 @@ textarea{resize:vertical;min-height:64px;width:100%}
           <li>Cada rodada tem só pares completos: nenhuma peça sobra no fim. Para não dar para acertar no chute, a rodada junta pares parecidos entre si (mesmo tema, prazos e números próximos).</li>
           <li>No modo iniciante, ao escolher uma peça, três opções brilham por alguns segundos e uma delas é a certa.</li>
           <li>Ao importar do Anki, o 1º campo vira uma peça e o 2º vira a peça par. Se a nota tiver um campo "Tipo" (como nos baralhos Mahjuris), ele define o rótulo da peça. Baralhos de certo ou errado vêm desmarcados.</li>
-          <li>Respostas com texto idêntico (por exemplo, duas perguntas cuja resposta é "10 dias") valem para qualquer uma delas.</li>
+          <li>Respostas iguais ou muito parecidas (o mesmo prazo, a mesma data, um texto quase igual) não aparecem no mesmo tabuleiro: o sorteio coloca cada uma numa fase diferente, para que cada pergunta tenha uma única resposta possível. Se mesmo assim duas respostas idênticas aparecerem juntas, qualquer uma vale.</li>
         </ul>
       </details>
       <p class="note" style="margin:0">O Mahjuris é um app independente, sem vínculo com órgãos públicos ou bancas de concurso. Textos de lei vêm de fontes oficiais (planalto.gov.br e sites das assembleias legislativas). Confira sempre a redação vigente.</p>
@@ -263,6 +309,14 @@ textarea{resize:vertical;min-height:64px;width:100%}
     <div class="editzone"><button class="btn small redit" id="btn-edit" type="button" hidden>Editar carta</button></div>
   </section>
 
+  <section id="view-diary" hidden>
+    <div class="panel tempo" id="diary-box"></div>
+  </section>
+
+  <section id="view-rank" hidden>
+    <div class="panel tempo" id="rank-box"></div>
+  </section>
+
   <section id="view-stats" hidden>
     <div class="panel tempo" id="tempo-box"></div>
   </section>
@@ -278,7 +332,9 @@ textarea{resize:vertical;min-height:64px;width:100%}
           <p class="msg" id="imp-msg" aria-live="polite"></p>
           <div id="imp-preview" style="display:flex;flex-direction:column;gap:6px"></div>
         </div>
+        <div class="row" style="display:flex;gap:6px;flex-wrap:wrap" id="bulk-bar"></div>
         <ul class="decklist" id="decklist"></ul>
+        <div id="hidden-box"></div>
         <div class="field" style="border-top:1px solid var(--line);padding-top:12px"><label for="new-deck-name">Novo baralho</label><input type="text" id="new-deck-name" placeholder="Ex.: Lei 10.990/97"></div>
         <button class="btn" id="btn-create-deck">Criar baralho vazio</button>
         <p class="note" id="sync-note">Salvando neste aparelho.</p>
@@ -403,9 +459,10 @@ function phasePairs(deck,size){
   if(Array.isArray(P.current)&&P.current.length&&P.current.every(x=>byId.has(x))) return P.current.map(x=>byId.get(x));
   const m=new Set(P.mastered), rv=P.review.filter(x=>byId.has(x));
   const fresh=shuffle(deck.pairs.filter(p=>!m.has(p.id)&&!rv.includes(p.id)));
-  const rvP=rv.slice(0,size).map(x=>byId.get(x));
+  // pares com resposta igual ou quase igual (mesmo prazo, data ou texto) nunca ficam no mesmo tabuleiro
+  const rvP=[]; rv.forEach(x=>{ const p=byId.get(x); if(rvP.length<size&&compatible(p,rvP)) rvP.push(p); });
   const pick=[...rvP,...pickSimilar(fresh,rvP,size-rvP.length)];
-  P.current=pick.map(p=>p.id); saveProg(deck.id);
+  P.current=pick.map(p=>p.id); P.size=size; saveProg(deck.id);
   return pick;
 }
 function renderPhase(){
@@ -429,6 +486,11 @@ function saveExtra(){try{localStorage.setItem(LSX,JSON.stringify(EXTRA))}catch(e
 function saveEdits(){try{localStorage.setItem(LSE,JSON.stringify(EDITS))}catch(e){}}
 const FIRST=BUILTIN[0]||SAMPLE;
 function allDecks(){return [...BUILTIN,SAMPLE,...decks]}
+/* baralhos que vêm com o app e a pessoa tirou da lista (dá para trazer de volta) */
+const LSH="mahjuris.hidden.v1";
+let HIDDEN=new Set(); try{const v=JSON.parse(localStorage.getItem(LSH)||"[]"); if(Array.isArray(v)) HIDDEN=new Set(v)}catch(e){}
+function saveHidden(){try{localStorage.setItem(LSH,JSON.stringify([...HIDDEN]))}catch(e){}}
+function shownDecks(){ const v=allDecks().filter(d=>!HIDDEN.has(d.id)); return v.length?v:allDecks(); }
 const TEMPD=new Map();
 function deckById(id){return TEMPD.get(id)||allDecks().find(d=>d.id===id)||FIRST}
 function wrongPairs(d){return d.pairs.filter(p=>{const x=DST.pairs[p.id]; return x&&x.err>0&&x.last===0})}
@@ -444,6 +506,18 @@ function dstat(id){return DST.decks[id]||(DST.decks[id]={ms:0,ok:0,err:0,fases:0
 function pstat(id){return DST.pairs[id]||(DST.pairs[id]={ok:0,err:0,last:1})}
 function statIdOf(d){return d.statId||d.id}
 function emptySess(){return {ms:0,ok:0,err:0,p:{}}}
+/* diário: o que a pessoa estudou em cada dia (tempo jogando, tempo estudando fora do jogo, acertos, fases, por baralho) */
+const LSY="mahjuris.daily.v1";
+let DAILY={days:{}}; try{const v=JSON.parse(localStorage.getItem(LSY)||"null"); if(v&&v.days&&typeof v.days==="object") DAILY=v}catch(e){}
+function dkey(t){const d=t!=null?new Date(t):new Date(), z=n=>String(n).padStart(2,"0"); return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())}
+function dday(k){ k=k||dkey(); return DAILY.days[k]||(DAILY.days[k]={ms:0,ok:0,err:0,fases:0,st:0,d:{},sm:{}}); }
+function dailySave(){ try{localStorage.setItem(LSY,JSON.stringify(DAILY))}catch(e){} try{ if(window.MJSocial&&MJSocial.changed) MJSocial.changed(); }catch(e){} }
+function dailyAdd(dk,x){
+  const y=dday(), sid=statIdOf(dk), base=allDecks().find(d=>d.id===sid)||dk;
+  const r=y.d[sid]||(y.d[sid]={n:base.name,m:materiaDe(base),ms:0,ok:0,err:0,fases:0}); r.n=base.name; r.m=materiaDe(base);
+  ["ms","ok","err","fases"].forEach(k=>{ const v=x[k]||0; y[k]=(y[k]||0)+v; r[k]=(r[k]||0)+v; });
+  dailySave();
+}
 const LSR="mahjuris.srs.v1", SRS_DAYS=[1,3,7,15,30];
 let SRS={}; try{SRS=JSON.parse(localStorage.getItem(LSR)||"{}")||{}}catch(e){SRS={}}
 function srsSave(){try{localStorage.setItem(LSR,JSON.stringify(SRS))}catch(e){}}
@@ -463,6 +537,7 @@ function statHit(ok,pr){ if(!G) return; if(ok) G.sess.ok++; else G.sess.err++;
 function commitSess(){ if(!G||!G.sess) return; const dk=deckById(G.deckId), s=stat(materiaDe(dk)), ds=dstat(statIdOf(dk));
   s.ms+=G.sess.ms; s.ok+=G.sess.ok; s.err+=G.sess.err; ds.ms+=G.sess.ms; ds.ok+=G.sess.ok; ds.err+=G.sess.err;
   const sid=statIdOf(dk); Object.entries(G.sess.p||{}).forEach(([id,e])=>{const ps=pstat(id); ps.ok+=e[0]; ps.err+=e[1]; ps.last=e[2]; if(e[0]+e[1]) ps.t=Date.now(); srsUpdate(id,e,sid)}); srsSave();
+  if(G.sess.ms>=1000||G.sess.ok||G.sess.err) dailyAdd(dk,{ms:G.sess.ms,ok:G.sess.ok,err:G.sess.err});
   G.sess=emptySess(); tSave(); }
 function shownStat(m){ const s=stat(m), x=(G&&G.sess&&materiaDe(deckById(G.deckId))===m)?G.sess:{ms:0,ok:0,err:0}; return {ms:s.ms+x.ms,ok:s.ok+x.ok,err:s.err+x.err,fases:s.fases} }
 function snapshot(){ if(!G||G.over) return null;
@@ -517,6 +592,56 @@ function playWrong(d){
   const wr=wrongPairs(d); if(!wr.length) return;
   const t={id:"erros__"+d.id,name:"Só os erros: "+d.name,group:groupOf(d),builtin:true,temp:true,statId:d.id,pairs:wr};
   TEMPD.set(t.id,t); dropProg(t.id); selectDeck(t.id); startGame();
+}
+/* refazer: só as cartas já jogadas, ou as que a pessoa escolher */
+function baseDeck(d){ return d&&d.temp?(allDecks().find(x=>x.id===d.statId)||d):d; }
+function playedPairs(d){ const P=PROG[d.id]||{}, seen=new Set([...(P.mastered||[]),...(P.review||[])]);
+  return d.pairs.filter(p=>{const x=DST.pairs[p.id]; return (x&&(x.ok||x.err))||seen.has(p.id)}); }
+function playSubset(d,pairs,label){
+  if(!pairs.length) return;
+  const t={id:"sel__"+d.id,name:label+": "+d.name,group:groupOf(d),builtin:true,temp:true,statId:d.id,pairs};
+  TEMPD.set(t.id,t); dropProg(t.id); hideOverlay(); selectDeck(t.id); startGame();
+}
+function openReplay(d){
+  d=baseDeck(d); if(!d||!d.pairs.length) return;
+  const played=playedPairs(d), wr=wrongPairs(d);
+  const dlg=$("dialog"); dlg.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Refazer o baralho";
+  const p=document.createElement("p"); p.style.margin="0"; p.textContent="\u201c"+d.name+"\u201d tem "+d.pairs.length+(d.pairs.length===1?" carta":" cartas")+". Escolha com quais cartas quer jogar de novo. O progresso das fases deste baralho não muda.";
+  const col=document.createElement("div"); col.className="col";
+  const b1=button("Só as cartas que já joguei ("+played.length+")","btn primary",()=>playSubset(d,played,"Já jogadas")); b1.disabled=!played.length;
+  const b2=button("Só as que errei ("+wr.length+")","btn",()=>{hideOverlay(); playWrong(d)}); b2.disabled=!wr.length;
+  const b3=button("Escolher as cartas","btn",()=>pickCards(d,played,wr));
+  let armedAll=false; const b4=button("O baralho inteiro, do zero","btn",()=>{ if(!armedAll){ armedAll=true; b4.textContent="Confirmar: zerar as fases e recomeçar"; b4.classList.add("danger"); return; } hideOverlay(); playWhole(d); });
+  col.append(b1,b2,b3,b4);
+  const row=document.createElement("div"); row.className="row"; row.appendChild(button("Cancelar","btn",()=>{hideOverlay(); resumeIfIdle();}));
+  dlg.append(h,p,col,row); $("overlay").hidden=false;
+}
+function pickCards(d,played,wr){
+  const sel=new Set(), lab=p=>TYPES[p.type]||["Frente","Verso"];
+  const dlg=$("dialog"); dlg.innerHTML="";
+  const h=document.createElement("h2"); h.id="dlg-title"; h.textContent="Escolher as cartas";
+  const q=document.createElement("input"); q.type="text"; q.placeholder="Buscar nas cartas"; q.setAttribute("aria-label","Buscar nas cartas"); q.style.width="100%";
+  const quick=document.createElement("div"); quick.className="row";
+  const list=document.createElement("ul"); list.className="picklist";
+  const cnt=document.createElement("p"); cnt.className="note"; cnt.style.margin="0";
+  const go=button("Jogar","btn primary",()=>playSubset(d,d.pairs.filter(p=>sel.has(p.id)),"Escolhidas"));
+  const vis=()=>{ const t=deacc(q.value.trim()); return t?d.pairs.filter(p=>deacc(p.front+" "+p.back+" "+(p.sub||"")).includes(t)):d.pairs; };
+  const upd=()=>{ cnt.textContent=sel.size+(sel.size===1?" carta escolhida":" cartas escolhidas"); go.disabled=!sel.size; go.textContent=sel.size?"Jogar com "+sel.size+(sel.size===1?" carta":" cartas"):"Jogar"; };
+  const draw=()=>{ list.innerHTML=""; const v=vis();
+    v.forEach(p=>{ const li=document.createElement("li"), l=document.createElement("label"), cb=document.createElement("input"); cb.type="checkbox"; cb.checked=sel.has(p.id);
+      cb.addEventListener("change",()=>{ cb.checked?sel.add(p.id):sel.delete(p.id); upd(); });
+      const tx=document.createElement("span"); const f=document.createElement("span"); f.className="pk-f"; f.textContent=p.front; const b=document.createElement("span"); b.className="pk-b"; b.textContent=" \u2192 "+p.back;
+      tx.append(f,b); const x=DST.pairs[p.id]; if(p.sub||x){ const sm=document.createElement("small"); sm.textContent=[p.sub||"",x&&(x.ok||x.err)?x.ok+" acertos, "+x.err+" erros":""].filter(Boolean).join(" · "); tx.appendChild(sm); }
+      l.append(cb,tx); li.appendChild(l); list.appendChild(li); });
+    if(!v.length){ const li=document.createElement("li"); li.className="note"; li.textContent="Nenhuma carta com esse texto."; list.appendChild(li); } upd(); };
+  const setTo=arr=>{ arr.forEach(p=>sel.add(p.id)); draw(); };
+  quick.append(button("Marcar as visíveis","btn small",()=>setTo(vis())), button("Desmarcar todas","btn small",()=>{sel.clear(); draw()}));
+  if(played.length) quick.appendChild(button("Já jogadas ("+played.length+")","btn small",()=>setTo(played)));
+  if(wr.length) quick.appendChild(button("Erradas ("+wr.length+")","btn small",()=>setTo(wr)));
+  q.addEventListener("input",draw);
+  const row=document.createElement("div"); row.className="row"; row.append(go,button("Voltar","btn",()=>openReplay(d)));
+  dlg.append(h,q,quick,list,cnt,row); draw(); $("overlay").hidden=false; q.focus();
 }
 const OPENMAT=new Set();
 function statSnap(){ const snap=JSON.stringify({STATS,DST}); return ()=>{ const o=JSON.parse(snap); STATS=o.STATS; DST=o.DST; tSave(); tRender(); renderTempo(); }; }
@@ -640,7 +765,7 @@ function renderTempo(){
       const row=document.createElement("div"); row.className="st-acts";
       row.append(...armed("all:"+d.id,"Jogar o baralho inteiro","Confirmar: recomeçar do zero","btn small",()=>{ dropProg(d.id); selectDeck(d.id); startGame(); },renderTempo));
       const eb=button(wr.length?"Jogar só as que errei ("+wr.length+")":"Nenhuma carta errada pendente","btn small primary",()=>playWrong(d));
-      eb.disabled=!wr.length; row.appendChild(eb);
+      eb.disabled=!wr.length; row.appendChild(eb); row.appendChild(button("Refazer ou escolher cartas","btn small",()=>openReplay(d)));
       { const sr=srsOf(d); if(sr.due.length) row.appendChild(button("Revisão de hoje ("+sr.due.length+")","btn small primary",()=>playReview(d))); else if(sr.later.length){ const n=document.createElement("span"); n.className="st-sub"; n.textContent="Próxima revisão "+whenT(sr.next); row.appendChild(n); } }
       tli.appendChild(row);
       // subtópicos (artigos), piores primeiro
@@ -665,8 +790,101 @@ function renderTempo(){
   const note=document.createElement("p"); note.className="note"; note.textContent="Aproveitamento = acertos ÷ (acertos + erros). Tudo fica salvo neste aparelho."; box.appendChild(note);
   const zr=document.createElement("div"); zr.className="st-acts"; zr.append(...armed("tempo","Zerar todas as estatísticas","Confirmar: zerar todas as matérias","btn small",()=>{ const u=statSnap(); STATS={}; DST={decks:{},pairs:{}}; T.phase=0; tSave(); tRender(); renderTempo(); offerUndo("Estatísticas zeradas.",u); },renderTempo)); box.appendChild(zr);
 }
+/* ---------- aba Diário: tempo de estudo por dia ---------- */
+let STW_IV=null, DIARY_MORE=30;
+function stwMs(){ const s=UI.stw; if(!s) return 0; return Math.min(12*3600e3,(s.acc||0)+(s.on?Math.max(0,Date.now()-s.t0):0)); }
+function stwStop(){ clearInterval(STW_IV); STW_IV=null; }
+function stwTick(){ const c=$("stw-clock"); if(!c){ stwStop(); return; } c.textContent=clockT(stwMs()); }
+function stwStart(mat){ const s=UI.stw||{acc:0}; UI.stw={on:true,t0:Date.now(),acc:s.acc||0,mat:mat||s.mat||""}; uiSave(); renderDiary(); }
+function stwPause(){ const s=UI.stw; if(!s) return; UI.stw={on:false,t0:0,acc:stwMs(),mat:s.mat}; uiSave(); renderDiary(); }
+function addStudy(ms,mat,day){
+  if(!(ms>=1000)) return; const y=dday(day); y.st=(y.st||0)+ms; const k=mat||"Estudo geral"; y.sm=y.sm||{}; y.sm[k]=(y.sm[k]||0)+ms; dailySave();
+}
+function stwSave(){ const ms=stwMs(), s=UI.stw; if(!s) return; UI.stw=null; uiSave(); addStudy(ms,s.mat); renderDiary(); if(ms>=1000) offerUndo(durT(ms)+" de estudo guardados no diário de hoje.",()=>{ const y=dday(); y.st=Math.max(0,(y.st||0)-ms); const k=s.mat||"Estudo geral"; if(y.sm&&y.sm[k]) y.sm[k]=Math.max(0,y.sm[k]-ms); dailySave(); renderDiary(); }); }
+function dayTot(y){ return (y&&((y.ms||0)+(y.st||0)))||0; }
+function streak(){ let n=0; const today=dayTot(DAILY.days[dkey()])>0; for(let i=today?0:1;i<4000;i++){ if(dayTot(DAILY.days[dkey(dayAt(-i))])>0) n++; else break; } return n; }
+function sumDays(n){ const t={ms:0,st:0,ok:0,err:0,fases:0,dias:0}; for(let i=0;i<n;i++){ const y=DAILY.days[dkey(dayAt(-i))]; if(!y) continue; t.ms+=y.ms||0; t.st+=y.st||0; t.ok+=y.ok||0; t.err+=y.err||0; t.fases+=y.fases||0; if(dayTot(y)>0) t.dias++; } return t; }
+function longDate(k){ const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}); }
+function renderDiary(){
+  const box=$("diary-box"); if(!box) return; box.innerHTML=""; stwStop();
+  const el=(tag,cls,text)=>{const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e;};
+  box.appendChild(el("h3",null,"Seu diário de estudo"));
+  box.appendChild(el("p","note","Todo dia fica registrado aqui: o tempo jogando os baralhos (o cronômetro do jogo) e o tempo estudando fora do jogo (o cronômetro abaixo)."));
+  const td=DAILY.days[dkey()]||{}, wk=sumDays(7), mo=sumDays(30), meta=+(DAILY.meta||0);
+  const cards=el("div","dy-cards");
+  const card=(t,v,s)=>{const c=el("div","dy-card"); c.append(el("span",null,t),el("b",null,v)); if(s) c.appendChild(el("small",null,s)); return c;};
+  cards.append(card("Hoje",durT(dayTot(td)),"Jogando "+durT(td.ms||0)+" · estudando "+durT(td.st||0)),
+    card("Acertos hoje",String(td.ok||0),(td.err||0)+((td.err||0)===1?" erro":" erros")+" · "+(td.fases||0)+((td.fases||0)===1?" fase":" fases")),
+    card("Últimos 7 dias",durT(wk.ms+wk.st),wk.dias+(wk.dias===1?" dia com estudo":" dias com estudo")),
+    card("Sequência",streak()+(streak()===1?" dia":" dias"),"dias seguidos estudando"));
+  box.appendChild(cards);
+  if(meta>0){ const pct=Math.min(100,Math.round(dayTot(td)/(meta*60000)*100)); const w=el("div"); w.style.cssText="display:flex;flex-direction:column;gap:4px";
+    w.append(el("span","phase-meta","Meta de hoje: "+durT(dayTot(td))+" de "+durT(meta*60000)+" ("+pct+"%)")); const m=el("div","meter"); const i=el("i"); i.style.width=pct+"%"; m.appendChild(i); w.appendChild(m); box.appendChild(w); }
+  // cronômetro de estudo fora do jogo
+  const sw=el("div","dy-stw"); sw.appendChild(el("strong",null,"Cronômetro de estudo"));
+  sw.appendChild(el("p","note","Para leitura de lei, aula, resumo ou questões fora do app. Ele continua contando se você fechar o app; o tempo entra no dia em que você toca em Guardar."));
+  const mats=[...new Set(shownDecks().map(groupOf))];
+  const row=el("div","dy-row");
+  const f=el("div","field"); const lb=el("label",null,"Matéria"); lb.htmlFor="stw-mat"; const sel=el("select"); sel.id="stw-mat";
+  ["Estudo geral",...mats].forEach(m=>{const o=el("option",null,m); o.value=m==="Estudo geral"?"":m; sel.appendChild(o);});
+  sel.value=(UI.stw&&UI.stw.mat)||""; sel.addEventListener("change",()=>{ if(UI.stw){ UI.stw.mat=sel.value; uiSave(); } });
+  f.append(lb,sel); row.appendChild(f);
+  const clock=el("span","clock",clockT(stwMs())); clock.id="stw-clock"; clock.setAttribute("role","timer");
+  const s=UI.stw; const btns=el("div","dy-row");
+  if(!s||!s.on) btns.appendChild(button(s&&s.acc?"Continuar":"Começar a estudar","btn primary",()=>stwStart(sel.value)));
+  else btns.appendChild(button("Pausar","btn",stwPause));
+  if(s){ btns.appendChild(button("Guardar no diário","btn"+(s.on?"":" primary"),stwSave)); btns.append(...armed("stw","Descartar","Confirmar: descartar","btn small danger",()=>{UI.stw=null; uiSave(); renderDiary();},renderDiary)); }
+  sw.append(row,clock,btns);
+  // tempo à mão
+  const man=el("details"); man.appendChild(el("summary",null,"Esqueceu o cronômetro? Adicionar tempo à mão")); man.querySelector("summary").style.cssText="cursor:pointer;font-size:.86rem;color:var(--muted)";
+  const mr=el("div","dy-row"); mr.style.marginTop="8px";
+  const mi=el("input"); mi.type="number"; mi.min="1"; mi.max="720"; mi.placeholder="min"; mi.setAttribute("aria-label","Minutos de estudo");
+  const di=el("input"); di.type="date"; di.max=dkey(); di.value=dkey(); di.setAttribute("aria-label","Dia");
+  const mm=el("p","msg");
+  mr.append(mi,di,button("Adicionar","btn small",()=>{ const v=Math.round(+mi.value); if(!(v>=1&&v<=720)){ mm.textContent="Digite de 1 a 720 minutos."; return; } const day=/^\d{4}-\d{2}-\d{2}$/.test(di.value)&&di.value<=dkey()?di.value:dkey(); addStudy(v*60000,sel.value,day); renderDiary(); offerUndo(v+" min adicionados em "+day.split("-").reverse().join("/")+".",null); }));
+  man.append(mr,mm); sw.appendChild(man);
+  box.appendChild(sw);
+  if(s&&s.on) STW_IV=setInterval(stwTick,1000);
+  // últimos 7 dias
+  box.appendChild(el("strong",null,"Últimos 7 dias"));
+  const days=[]; for(let i=6;i>=0;i--){ const k=dkey(dayAt(-i)); days.push([k,DAILY.days[k]||{},i===0]); }
+  const mx=Math.max(1,...days.map(([,y])=>dayTot(y)));
+  const bars=el("div","dy-bars"); bars.setAttribute("role","img");
+  bars.setAttribute("aria-label","Tempo de estudo nos últimos 7 dias: "+days.map(([k,y])=>k.split("-").reverse().slice(0,2).join("/")+" "+durT(dayTot(y))).join("; "));
+  days.forEach(([k,y,isToday])=>{ const b=el("div","dy-bar"+(isToday?" today":"")); b.title=k.split("-").reverse().join("/")+": jogando "+durT(y.ms||0)+", estudando "+durT(y.st||0);
+    const area=el("div"); area.style.cssText="flex:1;display:flex;flex-direction:column;justify-content:flex-end";
+    const s1=el("i","s"); s1.style.height=((y.st||0)/mx*100)+"%"; const g1=el("i","g"); g1.style.height=((y.ms||0)/mx*100)+"%";
+    area.append(s1,g1); const [yy,mm2,dd]=k.split("-").map(Number); b.append(area,el("em",null,new Date(yy,mm2-1,dd).toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","")));
+    bars.appendChild(b); });
+  box.appendChild(bars);
+  const leg=el("div","dy-leg"); const l1=el("span"); const i1=el("i"); i1.style.background="var(--ink)"; l1.append(i1,"Jogando"); const l2=el("span"); const i2=el("i"); i2.style.background="var(--ok)"; l2.append(i2,"Estudando fora do jogo"); leg.append(l1,l2,el("span",null,"30 dias: "+durT(mo.ms+mo.st))); box.appendChild(leg);
+  // histórico
+  box.appendChild(el("strong",null,"Todos os dias"));
+  const keys=Object.keys(DAILY.days).filter(k=>{const y=DAILY.days[k]; return dayTot(y)>0||y.ok||y.err;}).sort().reverse();
+  if(!keys.length) box.appendChild(el("p","note","Ainda não há dias registrados. Jogue uma fase ou use o cronômetro de estudo."));
+  const ul=el("ul","dy-hist");
+  keys.slice(0,DIARY_MORE).forEach(k=>{ const y=DAILY.days[k]; const li=el("li"); const det=el("details"); const sm=el("summary");
+    sm.append(el("span",null,longDate(k)),el("b",null,durT(dayTot(y)))); det.appendChild(sm);
+    det.appendChild(el("p","st-sub","Jogando "+durT(y.ms||0)+" · estudando "+durT(y.st||0)+" · "+(y.ok||0)+" acertos · "+(y.err||0)+" erros · "+(y.fases||0)+((y.fases||0)===1?" fase":" fases")));
+    const items=[...Object.values(y.d||{}).filter(x=>x.ms>=1000||x.ok||x.err).sort((a,b)=>b.ms-a.ms).map(x=>[x.m&&x.m!==x.n?x.m+" › "+x.n:x.n,durT(x.ms||0)+" · "+(x.ok||0)+" certos, "+(x.err||0)+" erros"]),
+      ...Object.entries(y.sm||{}).filter(([,v])=>v>=1000).map(([m,v])=>["Estudo: "+m,durT(v)])];
+    if(items.length){ const il=el("ul"); items.forEach(([a,b])=>{ const r=el("li"); r.append(el("span",null,a),el("b",null,b)); il.appendChild(r); }); det.appendChild(il); }
+    li.appendChild(det); ul.appendChild(li); });
+  box.appendChild(ul);
+  if(keys.length>DIARY_MORE) box.appendChild(button("Ver mais dias ("+(keys.length-DIARY_MORE)+")","btn small",()=>{DIARY_MORE+=60; renderDiary();}));
+  // meta
+  const mt=el("div","dy-row"); const mf=el("div","field"); const ml=el("label",null,"Meta de estudo por dia (minutos)"); ml.htmlFor="dy-meta"; const minp=el("input"); minp.type="number"; minp.id="dy-meta"; minp.min="0"; minp.max="720"; minp.value=meta||""; minp.placeholder="sem meta";
+  mf.append(ml,minp); mt.append(mf,button("Salvar meta","btn small",()=>{ const v=Math.max(0,Math.min(720,Math.round(+minp.value||0))); DAILY.meta=v; dailySave(); renderDiary(); }));
+  box.appendChild(mt);
+}
+function renderRank(){
+  const box=$("rank-box"); if(!box) return;
+  if(window.MJSocial&&MJSocial.render){ MJSocial.render(box); return; }
+  box.innerHTML=""; const h=document.createElement("h3"); h.textContent="Ranking"; const p=document.createElement("p"); p.className="note"; p.textContent="O ranking precisa de uma conta. Entre na sua conta para participar com um nickname."; box.append(h,p);
+}
 document.addEventListener("visibilitychange",()=>{ if(document.hidden){ T.wasRun=T.wasRun||T.run; tPause(); saveBoard(); } else if(T.wasRun){ T.wasRun=false; resumeIfIdle(); } });
 window.addEventListener("pagehide",()=>{ tTick(); saveBoard(); tSave(); });
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&!$("view-diary").hidden) renderDiary(); });
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 /* ---------- jogo ---------- */
@@ -732,15 +950,44 @@ function simScore(a,b){
   const wb=wordsOf(b); let sh=0; wordsOf(a).forEach(w=>{ if(wb.has(w)) sh++; }); return s+Math.min(4,sh);
 }
 function pickSimilar(cands,seed,k){
-  const pool=cands.slice(), out=[];
+  let pool=cands.filter(c=>compatible(c,seed)); const out=[];
   if(!seed.length&&pool.length&&k>0) out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
-  while(out.length<k&&pool.length){
-    const ref=[...seed,...out]; let best=-1, bi=0;
+  while(out.length<k){
+    const ref=[...seed,...out], last=out[out.length-1];
+    if(last) pool=pool.filter(c=>!clash(c,last));
+    if(!pool.length) break;
+    let best=-1, bi=0;
     pool.forEach((c,i)=>{ let sc=0; ref.forEach(r=>sc+=simScore(c,r)); sc=sc/ref.length+Math.random()*1.2; if(sc>best){best=sc; bi=i;} });
     out.push(pool.splice(bi,1)[0]);
   }
   return out;
 }
+/* Respostas que confundem: iguais, com o mesmo prazo/data/fração, ou com texto quase igual.
+   O fundamento entre parênteses no fim (ex.: "(CPP, art. 10)") não conta, porque não ajuda a separar uma da outra. */
+const deacc=s=>String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const CSTOP=new Set("a o as os de da do das dos e em no na nos nas um uma por para com ou que se ao aos sem sob".split(" "));
+const CUNIT="(?:dias?|horas?|h|anos?|meses|mes|semanas?|minutos?|min|%|vezes|salarios?|reais|uteis|corridos)";
+const CNUM={um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,quinze:15,vinte:20,trinta:30,sessenta:60,noventa:90};
+function coreOf(t){ let s=String(t); for(let i=0;i<3;i++){ const m=/\s*\(([^()]*)\)\s*\.?\s*$/.exec(s); if(!m||m.index<1) break; s=s.slice(0,m.index); } return deacc(s).replace(/[^a-z0-9%º°ª\/]+/g," ").trim(); }
+function qtyOf(s){ const out=new Set(); let m;
+  const re=new RegExp("(\\d+(?:[.,]\\d+)?(?:\\/\\d+)?)\\s*("+CUNIT+")\\b","g"); while((m=re.exec(s))) out.add(m[1]+" "+m[2].replace(/s$/,"").replace(/^h$/,"hora"));
+  const re2=new RegExp("\\b("+Object.keys(CNUM).join("|")+")\\s+("+CUNIT+")\\b","g"); while((m=re2.exec(s))) out.add(CNUM[m[1]]+" "+m[2].replace(/s$/,""));
+  (s.match(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g)||[]).forEach(x=>out.add("d:"+x));
+  (s.match(/\b\d+\/\d+\b/g)||[]).forEach(x=>out.add("f:"+x));
+  return out; }
+const CINF=new WeakMap();
+function cinfo(p){ const k=p.front+"\u0001"+p.back; let x=CINF.get(p); if(!x||x.k!==k){ const c=coreOf(p.back);
+  x={k,c,q:qtyOf(c),w:new Set(c.split(" ").filter(w=>w.length>2&&!CSTOP.has(w))),f:deacc(p.front).replace(/[^a-z0-9]+/g," ").trim()}; CINF.set(p,x); } return x; }
+function clash(p,q){
+  if(!p||!q||p===q) return false;
+  const a=cinfo(p), b=cinfo(q);
+  if(a.c===b.c||a.f===b.f) return true;
+  let n=0; a.w.forEach(w=>{ if(b.w.has(w)) n++; }); const j=a.w.size&&b.w.size?n/(a.w.size+b.w.size-n):0;
+  let sq=false; a.q.forEach(x=>{ if(b.q.has(x)) sq=true; });
+  if(sq&&(Math.min(a.c.length,b.c.length)<=40||j>=0.35)) return true;
+  return j>=0.6&&Math.min(a.w.size,b.w.size)>=2;
+}
+function compatible(p,list){ return list.every(q=>!clash(p,q)); }
 const words=s=>new Set(norm(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").split(/[^a-z0-9]+/).filter(w=>w.length>3));
 function pickDecoys(deck,pairs,k){
   if(k<=0) return [];
@@ -1011,7 +1258,7 @@ function reshuffle(){
 }
 function checkEnd(){
   if(G.tiles.some(t=>t.alive&&!t.decoy)) return;
-  G.over=true; tPause(); commitSess(); stat(materiaDe(deckById(G.deckId))).fases++; dstat(statIdOf(deckById(G.deckId))).fases++; tSave();
+  G.over=true; tPause(); commitSess(); stat(materiaDe(deckById(G.deckId))).fases++; dstat(statIdOf(deckById(G.deckId))).fases++; tSave(); dailyAdd(deckById(G.deckId),{fases:1});
   G.tiles.forEach(t=>{if(t.alive&&t.decoy){t.alive=false; el(t.id)?.classList.add("gone")}});
   const deck=deckById(G.deckId), P=prog(deck.id);
   const m=new Set(P.mastered), rv=new Set(P.review);
@@ -1058,6 +1305,7 @@ function deckDone(deck,lastPhase){
   d.appendChild(rp);
   if(sr.due.length) row.appendChild(button("Revisar só as que errei ("+sr.due.length+")","btn primary",()=>{hideOverlay(); playReview(base)}));
   row.appendChild(button("Refazer o baralho inteiro",sr.due.length?"btn":"btn primary",()=>{hideOverlay(); playWhole(base)}));
+  row.appendChild(button("Escolher as cartas","btn",()=>{ delete $("overlay").dataset.lock; pickCards(base,playedPairs(base),wrongPairs(base)); }));
   row.appendChild(button("Voltar ao menu","btn",()=>toMenu()));
   d.appendChild(row); showLocked();
 }
@@ -1086,17 +1334,54 @@ function showReader(k,t,state){const r=$("reader"); r.className="reader"+(state?
 /* ---------- baralhos ---------- */
 let current=FIRST.id, confirmDel=null;
 function groupOf(d){return d.group||(d.builtin?"Exemplos":"Seus baralhos")}
-function fillDecks(g){const s=$("sel-deck"); s.innerHTML=""; [...TEMPD.values(),...allDecks()].filter(d=>groupOf(d)===g).forEach(d=>{const o=document.createElement("option"); o.value=d.id; o.textContent=d.name+" ("+d.pairs.length+")"+(window.MJPlan&&!MJPlan.deckOk(d)?" · Premium":""); s.appendChild(o)})}
-function selectDeck(id){const d=deckById(id); $("sel-mat").value=groupOf(d); fillDecks(groupOf(d)); $("sel-deck").value=d.id; renderMenu();}
+function fillDecks(g,want){const s=$("sel-deck"); s.innerHTML=""; [...TEMPD.values(),...allDecks()].filter(d=>groupOf(d)===g&&(!HIDDEN.has(d.id)||d.id===want)).forEach(d=>{const o=document.createElement("option"); o.value=d.id; o.textContent=d.name+" ("+d.pairs.length+")"+(window.MJPlan&&!MJPlan.deckOk(d)?" · Premium":""); s.appendChild(o)})}
+function selectDeck(id){const d=deckById(id); if(![...$("sel-mat").options].some(o=>o.value===groupOf(d))){const o=document.createElement("option"); o.value=o.textContent=groupOf(d); $("sel-mat").appendChild(o);} $("sel-mat").value=groupOf(d); fillDecks(groupOf(d),d.id); $("sel-deck").value=d.id; renderMenu();}
 function renderDeckSelect(){
   const cur=$("sel-deck").value||FIRST.id, m=$("sel-mat"); m.innerHTML="";
-  [...new Set(allDecks().map(groupOf))].forEach(g=>{const o=document.createElement("option"); o.value=g; o.textContent=g; m.appendChild(o)});
-  selectDeck(allDecks().some(d=>d.id===cur)?cur:FIRST.id);
+  const sh=shownDecks();
+  [...new Set(sh.map(groupOf))].forEach(g=>{const o=document.createElement("option"); o.value=g; o.textContent=g; m.appendChild(o)});
+  selectDeck(sh.some(d=>d.id===cur)?cur:sh[0].id);
+}
+let BULK=null; // seleção para excluir vários baralhos de uma vez
+function removeDecks(list){
+  const own=list.filter(d=>!d.builtin), fab=list.filter(d=>d.builtin);
+  const snap=own.map(d=>({d,i:decks.indexOf(d),p:PROG[d.id]?JSON.parse(JSON.stringify(PROG[d.id])):null}));
+  own.forEach(d=>{ decks=decks.filter(x=>x!==d); deleteRemote(d); dropProg(d.id); }); if(own.length) lsWrite();
+  fab.forEach(d=>HIDDEN.add(d.id)); if(fab.length) saveHidden();
+  BULK=null; confirmDel=null; if(list.some(d=>d.id===current)) current=shownDecks()[0].id; renderDeckSelect(); renderDecks(); renderMenu();
+  const msg=list.length===1?(own.length?"Baralho \u201c"+list[0].name+"\u201d excluído.":"\u201c"+list[0].name+"\u201d saiu da sua lista."):(own.length?own.length+(own.length===1?" baralho excluído":" baralhos excluídos"):"")+(own.length&&fab.length?" e ":"")+(fab.length?fab.length+(fab.length===1?" baralho do app saiu da lista":" baralhos do app saíram da lista"):"")+".";
+  offerUndo(msg.charAt(0).toUpperCase()+msg.slice(1),()=>{ snap.sort((a,b)=>a.i-b.i).forEach(x=>{ decks.splice(Math.max(0,x.i),0,x.d); persist(x.d); if(x.p){ PROG[x.d.id]=x.p; saveProg(x.d.id); } }); fab.forEach(d=>HIDDEN.delete(d.id)); saveHidden(); current=list[0].id; });
+}
+function renderBulkBar(){
+  const bar=$("bulk-bar"); if(!bar) return; bar.innerHTML="";
+  if(!BULK){ bar.appendChild(button("Excluir vários baralhos","btn small",()=>{BULK=new Set(); confirmDel=null; renderDecks()})); return; }
+  const n=BULK.size, list=shownDecks().filter(d=>BULK.has(d.id));
+  if(confirmDel==="bulk"&&n){ bar.append(button("Confirmar: excluir "+n,"btn small danger",()=>removeDecks(list)), button("Cancelar","btn small",()=>{confirmDel=null; renderBulkBar()})); }
+  else { const x=button(n?"Excluir "+n+(n===1?" selecionado":" selecionados"):"Marque os baralhos","btn small danger",()=>{confirmDel="bulk"; renderBulkBar()}); x.disabled=!n; bar.append(x, button("Cancelar","btn small",()=>{BULK=null; confirmDel=null; renderDecks()})); }
+  if(n&&list.some(d=>d.builtin)){ const nt=document.createElement("p"); nt.className="note"; nt.style.width="100%"; nt.textContent="Os baralhos que vêm com o app só saem da sua lista: as estatísticas ficam guardadas e dá para trazer de volta em \u201cBaralhos removidos\u201d."; bar.appendChild(nt); }
+}
+function renderHidden(){
+  const box=$("hidden-box"); if(!box) return; box.innerHTML="";
+  const hid=allDecks().filter(d=>HIDDEN.has(d.id)); if(!hid.length) return;
+  const det=document.createElement("details"); det.className="hidbox";
+  const sm=document.createElement("summary"); sm.textContent="Baralhos removidos ("+hid.length+")"; det.appendChild(sm);
+  const ul=document.createElement("ul");
+  hid.forEach(d=>{ const li=document.createElement("li"); const n=document.createElement("span"); n.textContent=groupOf(d)+" \u203a "+d.name;
+    li.append(n,button("Trazer de volta","btn small",()=>{ HIDDEN.delete(d.id); saveHidden(); renderDeckSelect(); renderDecks(); })); ul.appendChild(li); });
+  if(hid.length>1){ const li=document.createElement("li"); li.appendChild(button("Trazer todos de volta","btn small",()=>{ HIDDEN.clear(); saveHidden(); renderDeckSelect(); renderDecks(); })); ul.appendChild(li); }
+  det.appendChild(ul); box.appendChild(det);
 }
 function renderDecks(){
   const ul=$("decklist"); ul.innerHTML="";
-  allDecks().forEach(d=>{
-    const li=document.createElement("li"); const b=document.createElement("button");
+  if(HIDDEN.has(current)||!allDecks().some(d=>d.id===current)) current=shownDecks()[0].id;
+  renderBulkBar(); renderHidden();
+  shownDecks().forEach(d=>{
+    const li=document.createElement("li");
+    if(BULK){ const l=document.createElement("label"); l.className="bulk"; const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=BULK.has(d.id);
+      cb.addEventListener("change",()=>{ cb.checked?BULK.add(d.id):BULK.delete(d.id); confirmDel=null; renderBulkBar(); });
+      const n=document.createElement("span"); n.textContent=d.name; const c=document.createElement("small"); c.textContent=d.builtin?"do app":"seu";
+      l.append(cb,n,c); li.appendChild(l); ul.appendChild(li); return; }
+    const b=document.createElement("button");
     b.setAttribute("aria-current",d.id===current?"true":"false");
     const n=document.createElement("span"); n.textContent=d.name;
     const ds=deckStatus(d); const c=document.createElement("small"); const rvn=srsOf(d).due.length; c.textContent=d.pairs.length+" pares · "+(ds.done?"estudado":"fase "+ds.phase)+(rvn?" · "+rvn+" para revisar":"");
@@ -1113,15 +1398,12 @@ function renderDetail(){
   const acts=document.createElement("div"); acts.className="row"; acts.style.cssText="display:flex;gap:6px;flex-wrap:wrap";
   acts.appendChild(button("Jogar este baralho","btn small primary",()=>{selectDeck(d.id); startGame()}));
   { const rv=srsOf(d).due.length; if(rv) acts.appendChild(button("Revisar só as que errei ("+rv+")","btn small primary",()=>playReview(d))); }
+  if(d.pairs.length) acts.appendChild(button("Refazer ou escolher cartas","btn small",()=>openReplay(d)));
   const dst=deckStatus(d);
   if(dst.mastered||dst.review||dst.phase>1) acts.append(...armed("prog","Zerar progresso","Confirmar: zerar progresso","btn small",()=>{ dropProg(d.id); renderDecks(); renderMenu(); },renderDetail));
   acts.appendChild(button("Duplicar baralho","btn small",()=>{const nd={id:uid(),name:d.name+" (cópia)",pairs:d.pairs.map(p=>{const q={id:uid(),type:p.type,front:p.front,back:p.back}; if(p.sub) q.sub=p.sub; return q})}; if(d.group) nd.group=d.group; decks.push(nd); persist(nd); current=nd.id; renderDeckSelect(); renderDecks(); offerUndo("Baralho duplicado: "+nd.name+".",()=>{decks=decks.filter(x=>x!==nd); lsWrite(); deleteRemote(nd); current=d.id})}));
-  if(!d.builtin){
-    acts.append(...armed("deck","Excluir baralho","Confirmar exclusão","btn small danger",()=>{
-      const i=decks.indexOf(d); decks=decks.filter(x=>x.id!==d.id); lsWrite(); deleteRemote(d); dropProg(d.id); current=FIRST.id; renderDeckSelect(); renderDecks();
-      offerUndo("Baralho \u201c"+d.name+"\u201d excluído.",()=>{ decks.splice(i,0,d); persist(d); current=d.id; });
-    },renderDetail));
-  }
+  if(!d.builtin) acts.append(...armed("deck","Excluir baralho","Confirmar exclusão","btn small danger",()=>removeDecks([d]),renderDetail));
+  else acts.append(...armed("deck","Remover da minha lista","Confirmar: remover","btn small danger",()=>removeDecks([d]),renderDetail));
   head.appendChild(acts); box.appendChild(head);
   if(d.pairs.length){const pn=document.createElement("p"); pn.className="note"; pn.textContent=dst.done?"Baralho estudado: todos os pares dominados.":"Fase "+dst.phase+" · "+dst.mastered+" de "+dst.total+" pares dominados"+(dst.review?" · "+dst.review+" para revisar":""); box.appendChild(pn)}
   if(d.builtin){const p=document.createElement("p"); p.className="note"; p.textContent=(d.id===SAMPLE.id?"Baralho de exemplo com questões de Direito.":"Baralho que vem com o app ("+(d.group||"Mahjuris")+").")+" Você pode editar, duplicar e copiar as cartas abaixo; as alterações ficam gravadas neste aparelho."; box.appendChild(p)}
@@ -1201,9 +1483,10 @@ function renderFsBtn(){
 }
 document.addEventListener("fullscreenchange",()=>{ if(!hasNativeFs()){ UI.fs=!!document.fullscreenElement; uiSave(); } renderFsBtn(); setTimeout(()=>{ if(G&&!$("view-play").hidden) renderBoard() },200); });
 function setView(v){
-  ["menu","play","decks","stats"].forEach(k=>{const el=$("view-"+k); el.hidden=k!==v; el.style.display=k===v?((k==="play"||k==="menu")?"flex":""):"none"});
+  ["menu","play","decks","stats","diary","rank"].forEach(k=>{const el=$("view-"+k); el.hidden=k!==v; el.style.display=k===v?((k==="play"||k==="menu")?"flex":""):"none"});
   $("hdr").hidden=v==="play";
-  $("tab-play").setAttribute("aria-pressed",v==="menu"); $("tab-decks").setAttribute("aria-pressed",v==="decks"); $("tab-stats").setAttribute("aria-pressed",v==="stats");
+  $("tab-play").setAttribute("aria-pressed",v==="menu"); $("tab-decks").setAttribute("aria-pressed",v==="decks"); $("tab-stats").setAttribute("aria-pressed",v==="stats"); $("tab-diary").setAttribute("aria-pressed",v==="diary"); $("tab-rank").setAttribute("aria-pressed",v==="rank");
+  if(v!=="diary") stwStop();
   if(v==="play"){ if(UI.fs) applyFs(true); renderFsBtn(); renderClockVis(); } else if(isFs()) applyFs(false);
   if(v==="play"&&G) renderBoard();
   if(v==="menu") renderMenu();
@@ -1224,7 +1507,7 @@ function renderMenu(){
     else if(st.done){ note.hidden=false; note.textContent="Você já dominou todos os pares deste assunto."; btn.textContent="Recomeçar do zero"; }
     else { note.hidden=true; btn.textContent="Jogar a fase "+st.phase; }
   }
-  btn.disabled=!deck.pairs.length;
+  btn.disabled=!deck.pairs.length; $("btn-replay").hidden=!baseDeck(deck).pairs.length;
   if(st.done&&!(P.board&&Array.isArray(P.board.tiles))) btn.textContent="Refazer o baralho inteiro";
   const rb=$("btn-review"), rn=$("review-note"), sr=deck.temp?{due:[],later:[]}:srsOf(deck);
   rb.hidden=!sr.due.length; rb.textContent="Revisar só as que errei ("+sr.due.length+")";
@@ -1239,7 +1522,7 @@ function startGame(){
   if(window.MJPlan&&!MJPlan.deckOk(deck)){ MJPlan.upsell("deck"); return; }
   if(P.board&&restoreGame(deck)){ setView("play"); return; }
   if(deckStatus(deck).done) dropProg(deck.id);
-  if(Array.isArray(P.current)&&P.current.length&&P.current.length!==Math.min(size,deck.pairs.length)){ P.current=null; saveProg(deck.id); }
+  if(Array.isArray(P.current)&&P.current.length&&(P.size!=null?P.size!==size:P.current.length!==Math.min(size,deck.pairs.length))){ P.current=null; saveProg(deck.id); }
   setView("play"); newGame();
 }
 function toMenu(){ hideOverlay(); tPause(); G=null; T.mat=null; T.phase=0; T.user=false; tRender(); renderDecksIfOpen(); setView("menu"); }
@@ -1260,10 +1543,13 @@ function exitGame(){
 $("tab-play").addEventListener("click",()=>setView("menu"));
 $("tab-decks").addEventListener("click",()=>{renderDecks(); setView("decks")});
 $("tab-stats").addEventListener("click",()=>{renderTempo(); setView("stats")});
+$("tab-diary").addEventListener("click",()=>{setView("diary"); renderDiary()});
+$("tab-rank").addEventListener("click",()=>{setView("rank"); renderRank()});
 $("sel-mat").addEventListener("change",()=>{fillDecks($("sel-mat").value); renderMenu()});
 ["sel-deck","sel-mode","sel-stack","sel-size"].forEach(id=>$(id).addEventListener("change",()=>renderMenu()));
 $("btn-play").addEventListener("click",startGame);
 $("btn-review").addEventListener("click",()=>playReview(deckById($("sel-deck").value)));
+$("btn-replay").addEventListener("click",()=>openReplay(deckById($("sel-deck").value)));
 $("btn-discard-saved").addEventListener("click",()=>{ const id=$("sel-deck").value, P=prog(id); P.board=null; P.current=null; saveProg(id); renderMenu(); });
 $("btn-exit").addEventListener("click",exitGame);
 $("btn-edit").addEventListener("click",editCard);
